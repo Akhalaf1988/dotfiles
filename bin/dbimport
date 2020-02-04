@@ -1,0 +1,170 @@
+#! /usr/bin/env bash
+
+readonly AWK='/bin/awk'
+readonly CUT='/bin/cut'
+readonly CAT='/bin/cat'
+readonly ECHO='/bin/echo'
+readonly GREP='/bin/grep'
+readonly LS='/bin/ls'
+readonly PWD='/bin/pwd'
+readonly SED='/bin/sed'
+readonly XZCAT='/usr/bin/xzcat'
+readonly ZCAT='/bin/zcat'
+
+####### PATH CHECK ######
+_domchk () {
+U="$(pwd | "$CUT" -d/ -f4)"
+G="$("$LS" /etc/httpd/conf.d/ \
+| "$GREP" "vhost_"$U".conf")"
+
+  if [[ -n "$G" ]]; then
+    varDOM="$U"
+    _mysqlchk
+else
+    "$ECHO" -n "What is the master domain: "
+    read varDOM
+    _vhostchk
+  fi
+}
+
+_vhostchk (){
+G="$("$LS" /etc/httpd/conf.d/ \
+| "$GREP" "vhost_"$varDOM".conf")"
+
+  if [[ -z "$G" ]]; then
+     "$ECHO" "No domain found"
+     _domchk
+else
+     _mysqlchk
+  fi
+}
+####  Adding and removing mysql user ######
+_mysqlchk(){
+C="$(siteworx -u --login_domain="$varDOM" -c MysqlUser \
+-n -a list \| "$AWK" '{print $1}' | "$GREP" "Pz9QmXl")"
+
+  if [[ -n "$C" ]]; then
+    "$ECHO" "User exists"
+else
+   if [[ -z "$C" ]]; then
+    trap "_mysqlrm" EXIT
+    _mysqladd
+ fi
+fi
+}
+_mysqladd(){
+##Add Pz9QmXl user to iworx
+"$ECHO" "adding mysql user"
+siteworx -u --login_domain="$varDOM" -c MysqlUser -n \
+-a add --name Pz9QmXl --password EZSRbdsEpHu5A8NR --confirm_password EZSRbdsEpHu5A8NR
+##list all databases
+D="$(siteworx -u --login_domain="$varDOM" -c MysqlDb -a list | "$AWK" '{print $1}')"
+##add Pz9QmXl user to all databases
+for x in $D; do siteworx -u --login_domain="$varDOM" -c MysqlPerms \
+-n -a add --name $x --user Pz9QmXl --perms all; done
+    _fileinfo
+}
+_mysqlrm(){
+siteworx -u --login_domain="$varDOM" -c MysqlUser -n -a delete --name Pz9QmXl
+   "$ECHO" "removed mysql user, all set!"
+}
+
+_fileinfo(){
+varUSER="$(siteworx -u --login_domain="$varDOM" -n -c overview \
+-a listAccountDetails | head -n1 | awk '{print $2}')"
+
+  "$ECHO" -n "
+File: "
+  read varDBF
+if [[ "$varDBF" == "stop" || "$varDBF" == "quit" || "$varDBF" == "q" ]]; then
+    "$ECHO" "ending script"
+else
+    _fileinfo2
+ fi
+}
+_fileinfo2(){
+I="$("$ECHO" "$varDBF" | "$SED" 's/.*\(...\)/\1/')"
+ if [[ "$I" == ".xz" || "$I" == ".gz" || "$I" == "sql" ]]; then
+   _dbinfo
+else
+   "$ECHO" "not a supported file extension"
+   _fileinfo
+ fi
+}
+
+_dbinfo(){
+B="$("$ECHO" "$varDBF" | "$SED" 's/.*\(...\)/\1/')"
+     "$ECHO" -n "Database: "
+        read varDB
+if [[ "$varDB" == "stop" || "$varDB" == "q" || "$varDB" == "quit" ]]; then
+     "$ECHO" "ending script"
+else
+   if [[ "$B" == "sql" ]]; then
+     _cat
+else
+   if [[ "$B" == ".xz" ]]; then
+     _xzcat
+else
+   if [[ "$B" == ".gz" ]]; then
+     _zcat
+   fi
+  fi
+ fi
+fi
+}
+_cat(){
+    "$ECHO" "Importing Database"
+"$CAT" "$varDBF" | "$SED" -r 's/DEFINER\s*\=\s*\S+\@\S+//g' \
+| mysql -u "$varUSER"_Pz9QmXl -p "$varDB" --password=EZSRbdsEpHu5A8NR
+    "$ECHO" "done
+"
+    _fileinfo
+}
+_zcat(){
+    "$ECHO" "Importing Database"
+"$ZCAT" "$varDBF" | "$SED" -r 's/DEFINER\s*\=\s*\S+\@\S+//g' \
+| mysql -u "$varUSER"_Pz9QmXl -p "$varDB" --password=EZSRbdsEpHu5A8NR
+    "$ECHO" "done
+"
+    _fileinfo
+}
+_xzcat(){
+   "$ECHO" "Importing Database"
+"$XZCAT" "$varDBF" | "$SED" -r 's/DEFINER\s*\=\s*\S+\@\S+//g' \
+| mysql -u "$varUSER"_Pz9QmXl -p "$varDB" --password=EZSRbdsEpHu5A8NR
+   "$ECHO" "done
+"
+   _fileinfo
+}
+###################################
+_helpsec(){
+DASH="$(for i in {1..69}; do "$ECHO" -n "-"; done)";
+
+    "$CAT" <<- EOF
+
+Help section:
+$DASH
+This script is used to import databases one after another for one user.
+Usage: dbimport
+
+Enter Master domain or any secondary domain..
+Enter filename or full path to filename plus file.
+Enter database name to import into.
+
+This script accepts xz, gz and sql extensions.
+
+If the file does not end in any of the above extensions, rename so ending has sql.
+
+There are multiple ways to exit the script.
+ctrl c at anytime, q, quit or stop when asked for file or database.
+$DASH
+
+EOF
+}
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+   _helpsec
+ else
+    _domchk
+ fi
+
+##############  END  ###############
