@@ -1,0 +1,654 @@
+#! /usr/bin/env bash
+D="$(pwd | sed 's:^/chroot::' | cut -d/ -f4)"
+U="$(pwd | sed 's:^/chroot::' | cut -d/ -f3)"
+DATE="$(date +"%m-%d-%y")"
+
+_rip(){
+   echo "backing up .htaccess to .htaccess-"$DATE" ..."
+cp .htaccess .htaccess-"$DATE"
+   echo "What ip?: "
+   read IP0
+printf '%s\n%s\n' "## IP Block ##
+order allow,deny
+allow from all
+deny from "$IP0"" "$(cat .htaccess)" >.htaccess
+
+   cat <<- EOF
+
+Successfully added
+
+## IP Block ##
+order allow,deny
+allow from all
+deny from $IP0
+
+EOF
+}
+##############
+_ripm(){
+   echo "backing up .htaccess to .htaccess-"$DATE" ..."
+cp .htaccess .htaccess-"$DATE"
+   echo "What ip?: "
+   read IP4
+printf '%s\n%s\n' "deny from "$IP4"" "$(cat .htaccess)" >.htaccess
+  _ripm1
+}
+
+_ripm1(){
+   echo "What ip?: "
+   read IP5
+printf '%s\n%s\n' "deny from "$IP5"" "$(cat .htaccess)" >.htaccess
+   echo "more ips y/n?"
+   read MI
+if [[ "$MI" == "y" ]] || [[ "$MI" == "Y" ]]; then
+    _ripm2
+else
+  printf '%s\n%s\n' "## IP Block ##
+order allow,deny
+allow from all" "$(cat .htaccess)" >.htaccess
+
+   cat <<- EOF
+
+Successfully added
+
+## IP Block ##
+order allow,deny
+allow from all
+deny from $IP4
+deny from $IP5
+
+EOF
+fi
+}
+
+_ripm2(){
+   echo "What ip?: "
+   read IP6
+printf '%s\n%s\n' "## IP Block ##
+order allow,deny
+allow from all
+deny from "$IP6"" "$(cat .htaccess)" >.htaccess
+
+   cat <<- EOF
+
+Successfully added
+
+## IP Block ##
+order allow,deny
+allow from all
+deny from $IP4
+deny from $IP5
+deny from $IP6
+
+EOF
+}
+
+_ripc(){
+   echo "backing up .htaccess to .htaccess-"$DATE" ..."
+cp .htaccess .htaccess-"$DATE"
+   echo "What ip?: "
+   read IP7
+printf '%s\n%s\n' "## IP Block ##
+Order allow,deny
+SetEnvIf X-Forwarded-For "$IP7" bad_ip
+Allow from all
+Deny from env=bad_ip" "$(cat .htaccess)" >.htaccess
+
+   cat <<- EOF
+
+Successfully added
+
+## IP Block ##
+Order allow,deny
+SetEnvIf X-Forwarded-For $IP7 bad_ip
+Allow from all
+Deny from env=bad_ip
+
+EOF
+}
+
+_ripmc(){
+
+   echo "backing up .htaccess to .htaccess-"$DATE" ..."
+cp .htaccess .htaccess-"$DATE"
+   echo "What ip?: "
+   read IP8
+   echo "What is the second ip?: "
+   read IP9
+   echo "More ips? y/n "
+   read IPC
+if [[ "$IPC" == "Y" ]] || [[ "$IPC" == "y" ]]; then
+    _ripmc1
+else
+   printf '%s\n%s\n' "## IP Block ##
+Order allow,deny
+SetEnvIf X-Forwarded-For "$IP8" bad_ip
+SetEnvIf X-Forwarded-For "$IP9" bad_ip
+Allow from all
+Deny from env=bad_ip" "$(cat .htaccess)" >.htaccess
+
+   cat <<- EOF
+
+Successfully added
+
+## IP Block ##
+Order allow,deny
+SetEnvIf X-Forwarded-For $IP8 bad_ip
+SetEnvIf X-Forwarded-For $IP9 bad_ip
+Allow from all
+Deny from env=bad_ip
+
+EOF
+fi
+}
+
+_ripmc1(){
+   echo "What is the third ip?"
+   read IP10
+   printf '%s\n%s\n' "## IP Block ##
+Order allow,deny
+SetEnvIf X-Forwarded-For "$IP8" bad_ip
+SetEnvIf X-Forwarded-For "$IP9" bad_ip
+SetEnvIf X-Forwarded-For "$IP10" bad_ip
+Allow from all
+Deny from env=bad_ip" "$(cat .htaccess)" >.htaccess
+
+   cat <<- EOF
+
+Successfully added
+
+## IP Block ##
+Order allow,deny
+SetEnvIf X-Forwarded-For $IP8 bad_ip
+SetEnvIf X-Forwarded-For $IP9 bad_ip
+SetEnvIf X-Forwarded-For $IP10 bad_ip
+Allow from all
+Deny from env=bad_ip
+
+EOF
+}
+
+##############################
+
+_rabot(){
+  echo "backing up .htaccess to .htaccess-"$DATE" ..."
+cp .htaccess .htaccess-"$DATE"
+printf '%s\n%s\n' "## Nexcess Bot Block ##
+RewriteEngine On
+RewriteCond %{HTTP_USER_AGENT} SMTBot/1.0 [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} Semrush [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} MegaIndex [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} Ahrefs [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} Yandex [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} MJ12bot [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} Exabot [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} DotBot [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} BLEXBot [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} AlphaBot [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} DomainCrawler [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} TinEye [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} serpstatbot/1.0 [NC]
+RewriteRule (.*) - [F,L]
+## Block End ##" "$(cat .htaccess)" >.htaccess
+
+   cat <<- EOF
+
+Successfully added
+
+## Nexcess Bot Block ##
+RewriteEngine On
+RewriteCond %{HTTP_USER_AGENT} SMTBot/1.0 [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} Semrush [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} MegaIndex [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} Ahrefs [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} Yandex [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} MJ12bot [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} Exabot [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} DotBot [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} BLEXBot [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} AlphaBot [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} DomainCrawler [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} TinEye [NC,OR]
+RewriteCond %{HTTP_USER_AGENT} serpstatbot/1.0 [NC]
+RewriteRule (.*) - [F,L]
+## Block End ##
+
+EOF
+}
+
+_ronebot(){
+   echo "backing up .htaccess-"$DATE" ..."
+cp .htaccess .htaccess-"$DATE"
+   echo -e "Bot name?: "
+   read BOT
+printf '%s\n%s\n' "## Bot block ##
+RewriteEngine On
+RewriteCond %{HTTP_USER_AGENT} "$BOT" [NC]
+RewriteRule (.*) - [F,L]
+## Block End ##" "$(cat .htaccess)" >.htaccess
+
+  cat <<- EOF
+
+Successfully added
+
+RewriteEngine On
+RewriteCond %{HTTP_USER_AGENT} $BOT [NC]
+RewriteRule (.*) - [F,L]
+
+EOF
+}
+
+#######restrict downloader page
+_deny(){
+  echo "backing up .htaccess to .htaccess-"$DATE" ..."
+cp .htaccess .htaccess-"$DATE"
+  echo "IP to whitelist?"
+  read IP
+if [[ -z $IP ]]; then
+     printf '%s\n%s\n' "#Block
+Order deny,allow
+Deny from all" "$(cat .htaccess)" >.htaccess
+
+   cat <<- EOF
+
+Successfully added
+
+Order deny,allow
+Deny from all
+
+EOF
+else
+     _askips
+fi
+}
+
+_askips(){
+ printf '%s\n%s\n' "#Allowed ips
+Allow from "$IP"
+#IP Block End" "$(cat .htaccess)" >.htaccess
+  _addips
+}
+
+_addips(){
+printf '%s\n%s\n' "#Block
+Order deny,allow
+Deny from all" "$(cat .htaccess)" >.htaccess
+
+   cat <<- EOF
+
+Successfully added
+
+Order deny,allow
+Deny from all
+Allow from $IP
+
+EOF
+}
+#####################3
+_radmin(){
+##admin
+   echo "backing up .htaccess to .htaccess-"$DATE" ..."
+cp .htaccess .htaccess-"$DATE"
+   echo "what is the admin ending"
+   read AD
+printf '%s\n%s\n' "RewriteRule (.*) - [F,L]" "$(cat .htaccess)" >.htaccess
+   _askaips
+}
+
+_askaips(){
+  echo "what is the ip?: "
+  read IP
+  _addaips
+}
+
+_addaips(){
+printf '%s\n%s\n' "RewriteCond %{REMOTE_ADDR} !^"$IP"" "$(cat .htaccess)" >.htaccess
+   _moreips
+}
+#################################
+_moreips(){
+   echo "additional ips y/n?"
+   read YN
+if [[ "$YN" == "y" ]] || [[ "$YN" == "Y" ]]; then
+  _askmips
+else
+  printf '%s\n%s\n' "## Admin block ##
+RewriteCond %{REQUEST_URI} ^/(index.php/)?"$AD"(.*) [NC]" "$(cat .htaccess)" >.htaccess
+
+   cat <<- EOF
+
+Successfully added
+
+## Admin block ##
+RewriteCond %{REQUEST_URI} ^/(index.php/)?$AD(.*) [NC]
+RewriteCond %{REMOTE_ADDR} !^$IP
+RewriteRule (.*) - [F,L]
+
+EOF
+fi
+}
+
+_askmips(){
+echo "what is ip?: "
+   read IP2
+   _addmips
+}
+_addmips(){
+printf '%s\n%s\n' "RewriteCond %{REMOTE_ADDR} !^"$IP2"" "$(cat .htaccess)" >.htaccess
+   _moreips2
+}
+
+##########################
+
+_moreips2(){
+    echo "additional ips y/n?"
+    read YN2
+  if [[ "$YN2" == "y" ]] || [[ "$YN2" == "Y" ]]; then
+  _askmips2
+else
+    printf '%s\n%s\n' "## Admin block ##
+RewriteCond %{REQUEST_URI} ^/(index.php/)?"$AD"(.*) [NC]" "$(cat .htaccess)" >.htaccess
+
+   cat <<- EOF
+
+Successfully added
+
+## Admin block ##
+RewriteCond %{REQUEST_URI} ^/(index.php/)?$AD(.*) [NC]
+RewriteCond %{REMOTE_ADDR} !^$IP
+RewriteCond %{REMOTE_ADDR} !^$IP2
+RewriteRule (.*) - [F,L]
+
+EOF
+fi
+}
+
+_askmips2(){
+echo "what is ip?: "
+   read IP3
+   _addmips2
+}
+_addmips2(){
+  printf '%s\n%s\n' "## Admin block ##
+RewriteCond %{REQUEST_URI} ^/(index.php/)?"$AD"(.*) [NC]
+RewriteCond %{REMOTE_ADDR} !^"$IP3"" "$(cat .htaccess)" >.htaccess
+
+   cat <<- EOF
+
+Successfully added
+
+## Admin block ##
+RewriteCond %{REQUEST_URI} ^/(index.php/)?$AD(.*) [NC]
+RewriteCond %{REMOTE_ADDR} !^$IP
+RewriteCond %{REMOTE_ADDR} !^$IP2
+RewriteCond %{REMOTE_ADDR} !^$IP3
+RewriteRule (.*) - [F,L]
+
+EOF
+}
+######################################
+_radminc(){
+ echo "backing up .htaccess to .htaccess-"$DATE" ..."
+cp .htaccess .htaccess-"$DATE"
+##admin proxy
+echo "what is the admin ending"
+   read AD
+printf '%s\n%s\n' "RewriteRule (.*) - [F,L]" "$(cat .htaccess)" >.htaccess
+   _askaipsc
+}
+
+_askaipsc(){
+  echo "what is the ip?: "
+  read IP
+  _addaipsc
+}
+
+_addaipsc(){
+printf '%s\n%s\n' "RewriteCond %{HTTP:X-FORWARDED-FOR} !^"$IP"$" "$(cat .htaccess)" >.htaccess
+   _moreipsc
+}
+#################################
+_moreipsc(){
+   echo "additional ips y/n?"
+   read YN
+if [[ "$YN" == "y" ]] || [[ "$YN" == "Y" ]]; then
+  _askmipsc
+else
+  printf '%s\n%s\n' "## Admin block ##
+RewriteCond %{REQUEST_URI} ^/(index.php/)?"$AD"(.*) [NC]" "$(cat .htaccess)" >.htaccess
+
+   cat <<- EOF
+
+Successfully added
+
+## Admin block ##
+RewriteCond %{REQUEST_URI} ^/(index.php/)?$AD(.*) [NC]
+RewriteCond %{HTTP:X-FORWARDED-FOR} !^$IP$
+RewriteRule (.*) - [F,L]
+
+EOF
+fi
+}
+
+_askmipsc(){
+   echo "what is ip?: "
+   read IP2
+   _addmipsc
+}
+_addmipsc(){
+   printf '%s\n%s\n' "RewriteCond %{HTTP:X-FORWARDED-FOR} !^"$IP2"$" "$(cat .htaccess)" >.htaccess
+   _moreips2c
+}
+##########################
+_moreips2c(){
+    echo "additional ips y/n?"
+    read YN2
+  if [[ "$YN2" == "y" ]] || [[ "$YN2" == "Y" ]]; then
+  _askmips2c
+else
+    printf '%s\n%s\n' "## Admin block ##
+RewriteCond %{REQUEST_URI} ^/(index.php/)?"$AD"(.*) [NC]" "$(cat .htaccess)" >.htaccess
+
+   cat <<- EOF
+
+Successfully added
+
+## Admin block ##
+RewriteCond %{REQUEST_URI} ^/(index.php/)?$AD(.*) [NC]
+RewriteCond %{HTTP:X-FORWARDED-FOR} !^$IP$
+RewriteCond %{HTTP:X-FORWARDED-FOR} !^$IP2$
+RewriteRule (.*) - [F,L]
+
+EOF
+fi
+}
+
+_askmips2c(){
+echo "what is ip?: "
+   read IP3
+   _addmips2c
+}
+_addmips2c(){
+  printf '%s\n%s\n' "## Admin block ##
+RewriteCond %{REQUEST_URI} ^/(index.php/)?"$AD"(.*) [NC]
+RewriteCond %{HTTP:X-FORWARDED-FOR} !^"$IP3"$" "$(cat .htaccess)" >.htaccess
+
+   cat <<- EOF
+
+Successfully added
+
+## Admin block ##
+RewriteCond %{REQUEST_URI} ^/(index.php/)?$AD(.*) [NC]
+RewriteCond %{HTTP:X-FORWARDED-FOR} !^$IP$
+RewriteCond %{HTTP:X-FORWARDED-FOR} !^$IP2$
+RewriteCond %{HTTP:X-FORWARDED-FOR} !^$IP3$
+RewriteRule (.*) - [F,L]
+
+EOF
+}
+
+_protect(){
+printf '%s\n%s\n' "AuthType Basic
+AuthName \"Password Protection\"
+AuthUserFile /home/"$U"/"$D"/.htpasswd
+Require valid-user" "$(cat .htaccess)" >.htaccess
+
+   cat  <<- EOF
+
+Successfully added
+
+AuthType Basic
+AuthName "Password Protection"
+AuthUserFile /home/$U/$D/.htpasswd
+Require valid-user
+
+EOF
+}
+
+_force(){
+
+   echo "What is the Domain?"
+   read DOMS
+
+printf '%s\n%s\n' "RewriteEngine On
+RewriteCond %{HTTP_HOST} "$DOMS" [NC]
+RewriteCond %{SERVER_PORT} 80
+RewriteRule ^(.*)$ https://"$DOMS"/\$1 [R,L]" "$(cat .htaccess)" >.htaccess
+
+   cat <<- EOF
+
+Successfully added
+
+RewriteEngine On
+RewriteCond %{HTTP_HOST} $DOMS [NC]
+RewriteCond %{SERVER_PORT} 80
+RewriteRule ^(.*)$ https://$DOMS/\$1 [R,L]
+
+EOF
+}
+
+_forcew(){
+
+   echo "What is the Domain"
+   read DOMSW
+
+printf '%s\n%s\n' "RewriteEngine On
+RewriteCond %{HTTP_HOST} "$DOMSW" [NC]
+RewriteCond %{SERVER_PORT} 80
+RewriteRule ^(.*)$ https://www."$DOMSW"/\$1 [R,L]" "$(cat .htaccess)" >.htaccess
+
+   cat <<- EOF
+
+Successfully added
+
+RewriteEngine On
+RewriteCond %{HTTP_HOST} $DOMSW [NC]
+RewriteCond %{SERVER_PORT} 80
+RewriteRule ^(.*)$ https://www.$DOMSW/\$1 [R,L]
+
+EOF
+}
+
+_forcec(){
+printf '%s\n%s\n' "RewriteEngine On
+RewriteCond %{HTTP:X-Forwarded-Proto} =http
+RewriteRule ^/?(.*) https://%{SERVER_NAME}/\$1 [R=301,L]" "$(cat .htaccess)" >.htaccess
+
+   cat <<- EOF
+
+Successfully added
+
+RewriteEngine On
+RewriteCond %{HTTP:X-Forwarded-Proto} =http
+RewriteRule ^/?(.*) https://%{SERVER_NAME}/\$1 [R=301,L]
+
+EOF
+}
+
+_helpsec(){
+      cat  <<- EOF
+
+Usage: bbots argument :ex bbots -d
+
+   Supported arguments
+
+      -a|--admin        restricts admin panel if given the admin name ex: user_admin
+      -A|--Admin        restricts admin panel x-forwarded if given the admin name ex: user_admin
+
+      -b|--bot          adds deny for specified user agent to .htaccess
+      -B|--BOT          adds basic bot block to .htaccess
+
+      -d|--deny         adds deny all to .htacces
+
+      -f|--force        adds https rediect for physical
+      -F|--Force        adds https redirect for cloud
+      -w|--www          adds https://www. redirect
+      -h|--help         displays this message
+
+      -m|--multi        adds deny rule for up to 3 IP addresses
+      -M|--Multi        adds deny rule for up to 3 IP addresses x-forwarded
+      -s|--single       adds deny rule for one IP address
+      -S|--Single       adds deny rule for one IP address x-forwarded
+
+      -p|--protect      Adds basic auth to .htaccess
+
+EOF
+}
+
+if [[ "$1" == "-d" ]] || [[ "$1" == "--deny" ]]; then
+     _deny
+else
+if [[ "$1" == "-b" ]] || [[ "$1" == "--bot" ]]; then
+     _ronebot
+else
+if [[ "$1" == "-B" ]] || [[ "$1" == "--BOT" ]]; then
+     _rabot
+else
+if [[ "$1" == "-a" ]] || [[ "$1" == "--admin" ]]; then
+     _radmin
+else
+if [[ "$1" == "-A" ]] || [[ "$1" == "--Admin" ]]; then
+     _radminc
+else
+if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
+     _helpsec
+else
+if [[ "$1" == "-s" ]] || [[ "$1" == "--single" ]]; then
+     _rip
+else
+if [[ "$1" == "-m" ]] || [[ "$1" == "--multi" ]]; then
+     _ripm
+else
+if [[ "$1" == "-S" ]] || [[ "$1" == "--Single" ]]; then
+     _ripc
+else
+if [[ "$1" == "-M" ]] || [[ "$1" == "--Multi" ]]; then
+     _ripmc
+else
+if [[ "$1" == "-f" ]] || [[ "$1" == "--force" ]]; then
+     _force
+else
+if [[ "$1" == "-w" ]] || [[ "$1" == "--www" ]]; then
+     _forcew
+else
+if [[ "$1" == "-F" ]] || [[ "$1" == "--Force" ]]; then
+     _forcec
+else
+if [[ "$1" == "-p" ]] || [[ "$1" == "--protect" ]]; then
+     _protect
+else
+     _helpsec
+            fi
+           fi
+          fi
+         fi
+        fi
+       fi
+      fi
+     fi
+    fi
+   fi
+  fi
+ fi
+fi
+fi
