@@ -1,0 +1,180 @@
+#! /usr/bin/env bash
+
+_domchk(){
+D="$(pwd | cut -d/ -f4)"
+V="$(ls /etc/httpd/conf.d/ \
+| grep "vhost_"$D".conf")"
+
+  if [[ -n "$V" ]]; then
+    DOM="$D"
+else
+    echo "What is the Master Domain?: "
+    read DOM
+    _vhostchk
+  fi
+}
+
+_vhostchk(){
+V="$(ls /etc/httpd/conf.d/ \
+| grep "vhost_"$DOM".conf")"
+
+  if [[ -z "$V" ]]; then
+     echo "No Domain Found"
+     _domchk
+  fi
+}
+_userinfo(){
+   echo "User?"
+   read U
+   _userchk
+}
+
+_userchk(){
+I="$(pwd | cut -d/ -f3)"
+C="$(sudo siteworx -u --login_domain="$DOM" \
+-c MysqlUser -n -a listMysqlUsers | awk '{print $2}'| grep ""$I"$U"$)"
+
+if [[ -z "$C" ]]; then
+_passinfo
+else
+echo "User exists"
+_userinfo
+fi
+}
+
+_xkcd(){
+if [[ -e /usr/local/interworx/lib/dict/words ]]; then
+
+    D='/usr/local/interworx/lib/dict/words';
+    _getpass
+else
+   D='/usr/share/dict/words'
+   _getpass
+fi
+}
+
+_getpass(){
+W1="$(shuf -n1000 "$D" | head -n1 | sed -e 's|["'\'']||g')"
+W2="$(shuf -n1000 "$D" | tail -n1 | sed -e 's|["'\'']||g')"
+W3="$(shuf -n1000 "$D" | head -n1 | sed -e 's|["'\'']||g')"
+W4="$(shuf -n1000 "$D" | tail -n1 | sed -e 's|["'\'']||g')"
+W5="$(shuf -n1000 "$D" | tail -n1 | sed -e 's|["'\'']||g')"
+N="$(seq 99 | sort -R | tail -n1)"
+ echo ""$W1""$W2""$W3""$W""$W5""$N""
+}
+_passinfo(){
+   echo "password? (defualt Random)"
+   read PW
+ if [ -z "$PW" ]; then
+   PW="$(_xkcd)"
+else
+   PW="$PW"
+ fi
+}
+
+_adduser1(){
+R="$(siteworx -u --login_domain="$DOM" \
+-n -c overview -a listAccountDetails \
+| head -n1 | awk '{print $2}')"
+echo "what is the DB name?"
+  read DB1
+
+echo "adding user"
+sudo siteworx -u --login_domain="$DOM" \
+-c MysqlUser -n -a add --name "$U" \
+--password "$PW" --confirm_password "$PW"
+siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name "$DB1" --user "$U" --perms all
+
+echo "
+Username: "$R"_"$U"
+password: "$PW"
+Database: "$R"_"$DB1""
+
+}
+
+_adduserall(){
+D="$(siteworx -u --login_domain="$DOM" \
+-c MysqlDb -a list | awk '{print $1}')"
+R="$(siteworx -u --login_domain="$DOM" \
+-n -c overview -a listAccountDetails \
+| head -n1 | awk '{print $2}')"
+echo "adding user"
+sudo siteworx -u --login_domain="$DOM" \
+-c MysqlUser -n -a add --name "$U" \
+--password "$PW" --confirm_password "$PW"
+
+for x in $D; do siteworx -u --login_domain="$DOM" \
+-c MysqlPerms -n -a add --name $x --user "$U" --perms all; done
+
+echo "
+Username: "$R"_"$U"
+password: "$PW""
+
+}
+
+_adduser(){
+R="$(siteworx -u --login_domain="$DOM" \
+-n -c overview -a listAccountDetails \
+| head -n1 | awk '{print $2}')"
+echo -n "adding user"
+sudo siteworx -u --login_domain="$DOM" \
+-c MysqlUser -n -a add --name "$U" \
+--password "$PW" --confirm_password "$PW"
+echo "
+Username: "$R"_"$U"
+password: "$PW""
+
+}
+_listusers(){
+echo "
+Users          Has permissions on"
+sudo siteworx -u --login_domain="$DOM" \
+-c MysqlUser -n -a listMysqlUsers | awk '{print $2, $3}'
+}
+
+_helpsec(){
+
+   cat <<- EOF
+
+Usage: uadd argument ex. uadd -a
+
+         supported aruguments
+
+         -a|--add     Will add user to all db's
+         -h|--help    Will display this message
+         -l|--list    Will list all current mysql user
+         -n|--none    Will only add the user
+         -o|--one     Will configure the user to one db
+
+            Note: No need to add the unix user portion to the name.
+
+EOF
+}
+if [[ "$1" == "-o" || "$1" == "--one" ]]; then
+ _domchk
+ _userinfo
+_adduser1
+else
+if [[ "$1" == "-a" || "$1" == "--all" ]]; then
+_domchk
+_userinfo
+_adduserall
+else
+if [[ "$1" == "-n" || "$1" == "--none" ]]; then
+_domchk
+_userinfo
+_adduser
+else
+if [[ "$1" == "-l"  || "$1" == "--list" ]]; then
+_domchk
+_listusers
+else
+if [[ "$1" == "-h"  || "$1" == "--help" ]]; then
+_helpsec
+else
+_helpsec
+    fi
+   fi
+  fi
+ fi
+fi
