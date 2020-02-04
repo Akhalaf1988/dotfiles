@@ -1,0 +1,304 @@
+ddns(){
+if [[ -z "$1" ]]; then
+   echo -n "Domain Name: "
+   read D
+  _reg
+else
+    D="$1"
+  _reg
+fi
+}
+_reg(){
+DASH="$(for i in {1..23}; \
+do echo -n "-"; done)"
+DASH1="$(for i in {1..10}; \
+do echo -n "-"; done)"
+B='\033[1;34m'
+RED='\033[0;31m'
+ORANGE='\033[0;36m'
+NC='\033[0m'
+GREEN='\033[0;32m'
+E="$(echo "$D" | sed 's/.*\(...\)/\1/')"
+   if [[ "$E" == "com" ]]; then
+     _com
+else
+   if [[ "$E" == ".br" ]]; then
+     _br
+else
+   if [[ "$E" == ".au" ]]; then
+     _au
+else
+if [[ "$E" == ".uk" ]]; then
+     _uk
+else
+    _com
+   fi
+  fi
+ fi
+fi
+}
+_com(){
+echo -e ""$B"DNS Summary: $D
+$DASH"$NC""
+R="$(whois "$D" | grep "Registrar:" | tail -n1 | awk '{print $2, $3}' 2> /dev/null)"
+if [[ -z "$R" ]]; then
+    echo -e ""$B"Registrar"$NC"
+"$RED"No Registrar found"$NC""
+   _arecord
+else
+if [[ "$R" != "TUCOWS, INC." ]]; then
+   echo -e ""$B"Registrar"$NC"
+$RED""$R""$NC"
+  _arecord
+else
+   echo -e ""$B"Registrar"$NC"
+$GREEN""$R""$NC"
+  _arecord
+ fi
+fi
+}
+_br(){
+  echo -e ""$B"DNS Summary: $D
+$DASH"$NC""
+R="$(whois "$D" | grep Registration | awk '{print $4}' 2> /dev/null)"
+if [[ -z "$R" ]]; then
+   echo -e ""$B"Registrar"$NC"
+"$RED"No Registrar found"$NC""
+  _arecord
+else
+if [[ "$R" != "TUCOWS, INC." ]]; then
+   echo -e ""$B"Registrar"$NC"
+$RED""$R""$NC"
+  _arecord
+else
+   echo -e ""$B"Registrar"$NC"
+$GREEN""$R""$NC"
+  _arecord
+ fi
+fi
+}
+_uk(){
+  echo -e ""$B"DNS Summary: $D
+$DASH"$NC""
+R="$(whois "$D" | grep -A 1 Registrar: | tail -n1 | sed -e 's/^[ \t]*//' 2> /dev/null)"
+if [[ -z "$R" ]]; then
+   echo -e ""$B"Registrar"$NC"
+"$RED"No Registrar found"$NC""
+  _arecord
+else
+if [[ "$R" != "TUCOWS, INC." ]]; then
+   echo -e ""$B"Registrar"$NC"
+$RED""$R""$NC"
+  _arecord
+else
+   echo -e ""$B"Registrar"$NC"
+$GREEN""$R""$NC"
+  _arecord
+ fi
+fi
+}
+_au(){
+  echo -e ""$B"DNS Summary: $D
+$DASH"$NC""
+R="$(whois "$D" | grep "Registrar Name:" | awk '{print $3, $4, $5, $6}' 2> /dev/null)"
+if [[ -z "$R" ]]; then
+   echo -e ""$B"Registrar"$NC"
+"$RED"No Registrar found"$NC""
+  _arecord
+else
+if [[ "$R" != "TUCOWS, INC." ]]; then
+   echo -e ""$B"Registrar"$NC"
+$RED""$R""$NC"
+  _arecord
+else
+   echo -e ""$B"Registrar"$NC"
+$GREEN""$R""$NC"
+  _arecord
+ fi
+fi
+}
+_arecord(){
+A="$(dig +short "$D" | grep -v [a-z,A-Z] 2> /dev/null)"
+A1="$(dig +short "$D" | grep -v [a-z,A-Z] | tail -n1 2> /dev/null)"
+if [[ -z "$A" ]]; then
+   echo -e ""$B""$DASH1"
+A"$NC"
+"$RED"No A Record"$NC"
+"$B""$DASH1"
+RDNS"$NC"
+"$RED"No RDNS Record"$NC""
+  _mail
+else
+RA="$(whois "$A1" | grep -e "Melrose" -e "Creyts" | tail -n1 | awk '{print $2, $3}' 2> /dev/null)"
+RAC="$(whois "$A1" | grep "RTechEmail" | tail -n1 | awk '{print $2}' | sed -e 's/rir@//g' 2> /dev/null)"
+RAS="$(whois "$A1" | grep "OrgName:" | awk '{print $2}' 2> /dev/null)"
+if [[ "$RAC" == "cloudflare.com" || "$RAS" == "Sucuri" ]]; then
+   echo -e ""$B""$DASH1"
+A"$NC"
+$ORANGE""$A""$NC"
+_rdns
+else
+if [[ "$RA" == "21700 Melrose" ]] || [[ "$RA" == "4210 Creyts" ]]; then
+   echo -e ""$B""$DASH1"
+A"$NC"
+$GREEN""$A""$NC"
+  _rdns
+else
+  echo -e ""$B""$DASH1"
+A"$NC"
+$RED""$A""$NC"
+  _rdns
+  fi
+ fi
+fi
+}
+_rdns(){
+A2="$(dig +short "$D" | grep -v [a-z,A-Z] | tail -n1 2> /dev/null)"
+RDNS="$(for x in $(dig +short "$D" | grep -v [a-z,A-Z]); do dig +short -x "$x"; done 2> /dev/null)"
+RDNS1="$(for x in $(dig +short "$D" | grep -v [a-z,A-Z]); do dig +short -x "$x"; done | tail -n1 2> /dev/null)"
+
+if [[ -z "$RDNS" ]]; then
+   echo -e ""$B""$DASH1"
+RDNS"$NC"
+"$RED"No RDNS Record"$NC""
+  _mail
+else
+RDNS2="$(dig +short "$RDNS1" 2> /dev/null)"
+if [[ -z "$RDNS2" ]]; then
+   echo -e ""$B""$DASH1"
+RDNS"$NC"
+$RED""$RDNS""$NC"
+  _mail
+else
+
+W="$(whois "$RDNS2" | grep -e "Melrose" -e "Creyts" | tail -n1 | awk '{print $2, $3}' 2> /dev/null)"
+RAC1="$(whois "$RDNS2" | grep "RTechEmail" | tail -n1 | awk '{print $2}' | sed -e 's/rir@//g' 2> /dev/null)"
+RAS1="$(whois "$RDNS2" | grep "OrgName:" | awk '{print $2}' 2> /dev/null)"
+if [[ "$RAC1" == "cloudflare.com" || "$RAS1" == "Sucuri" ]]; then
+   echo -e ""$B""$DASH1"
+RDNS"$NC"
+$ORANGE""$RDNS""$NC"
+   _mail
+else
+if [[ "$W" == "4210 Creyts" || "$W" == "21700 Melrose" ]]; then
+   echo -e ""$B""$DASH1"
+RDNS"$NC"
+$GREEN""$RDNS""$NC"
+  _mail
+else
+   echo -e ""$B""$DASH1"
+RDNS"$NC"
+$RED""$RDNS""$NC"
+  _mail
+   fi
+  fi
+ fi
+fi
+}
+
+_mail(){
+MX="$(dig +short mx "$D" 2> /dev/null)"
+
+if [[ -z "$MX" ]]; then
+   echo -e ""$B""$DASH1"
+MX"$NC"
+"$RED"No MX Record"$NC"
+"$B""$DASH1"
+DMX"$NC"
+"$RED"No DMX Record"$NC""
+_txt
+else
+if [[ "$MX" != "10 mail.$D." ]]; then
+   echo -e ""$B""$DASH1"
+MX"$NC"
+$RED""$MX""$NC"
+  _dmx
+else
+   echo -e ""$B""$DASH1"
+MX"$NC"
+$GREEN""$MX""$NC"
+  _dmx
+ fi
+fi
+}
+_dmx(){
+DMX="$(for y in $(dig +short mx "$D"); \
+do dig +short "$y"; done 2> /dev/null)"
+
+DMX1="$(for y in $(dig +short mx "$D"); \
+do dig +short "$y"; done | tail -n1 2> /dev/null)"
+
+if [[ -z "$DMX1" ]]; then
+   echo -e ""$B""$DASH1"
+DMX"$NC"
+"$RED"No DMX Record"$NC""
+  _txt
+else
+W1="$(whois "$DMX1" | grep -e "Melrose" -e "Creyts" | tail -n1 | awk '{print $2, $3}' 2> /dev/null)"
+RAC2="$(whois "$DMX1" | grep "RTechEmail" | tail -n1 | awk '{print $2}' | sed -e 's/rir@//g' 2> /dev/null)"
+RAS2="$(whois "$DMX1" | grep "OrgName:" | awk '{print $2}' 2> /dev/null)"
+if [[ "$RAC2" == "cloudflare.com" || "$RAS2" == "Sucuri" ]]; then
+   echo -e ""$B""$DASH1"
+DMX"$NC"
+$ORANGE""$DMX1""$NC"
+  _txt
+else
+
+if [[ "$W1" == "4210 Creyts" || "$W1" == "21700 Melrose" ]]; then
+  echo -e ""$B""$DASH1"
+DMX"$NC"
+$GREEN""$DMX""$NC"
+  _txt
+else
+   echo -e ""$B""$DASH1"
+DMX"$NC"
+$RED""$DMX""$NC"
+  _txt
+  fi
+ fi
+fi
+}
+_txt(){
+TXT="$(dig +short txt "$D" \
+| grep "v=spf1" 2> /dev/null)"
+
+if [[ -z "$TXT" ]]; then
+   echo -e ""$B""$DASH1"
+SPF"$NC"
+"$RED"No SPF Record"$NC""
+  _nameserver
+else
+if [[ "$MX" != "10 mail.$D." ]]; then
+   echo -e ""$B""$DASH1"
+SPF"$NC"
+$RED""$TXT""$NC"
+  _nameserver
+else
+   echo -e ""$B""$DASH1"
+SPF"$NC"
+$GREEN""$TXT""$NC"
+  _nameserver
+ fi
+fi
+}
+_nameserver(){
+NS="$(dig +short ns "$D" 2> /dev/null)"
+NS1="$(dig +short ns "$D" \
+| tail -n1 | cut -d. -f2 2> /dev/null)"
+
+if [[ -z "$NS" ]]; then
+   echo -e ""$B""$DASH1"
+Name Server"$NC"
+"$RED"No NS Record"$NC""
+else
+if [[ "$NS1" != "nexcess" ]]; then
+   echo -e ""$B""$DASH1"
+Name server"$NC"
+$RED""$NS""$NC"
+else
+   echo -e ""$B""$DASH1"
+Name server"$NC"
+$GREEN""$NS""$NC"
+ fi
+fi
+}
