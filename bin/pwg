@@ -1,0 +1,24 @@
+#! /usr/bin/env bash
+
+
+_wcheck(){
+if [[ -e /usr/local/interworx/lib/dict/words ]]; then
+
+    D='/usr/local/interworx/lib/dict/words';
+    _getpass
+else
+   D='/usr/share/dict/words'
+   _getpass
+fi
+}
+
+_getpass(){
+W1="$(shuf -n1000 "$D" | head -n1 | sed -e 's|["'\'']||g')"
+W2="$(shuf -n1000 "$D" | tail -n1 | sed -e 's|["'\'']||g')"
+W3="$(shuf -n1000 "$D" | head -n1 | sed -e 's|["'\'']||g')"
+W4="$(shuf -n1000 "$D" | tail -n1 | sed -e 's|["'\'']||g')"
+W5="$(shuf -n1000 "$D" | tail -n1 | sed -e 's|["'\'']||g')"
+N="$(seq 99 | sort -R | tail -n1)"
+ echo ""$W1""$W2""$W3""$W""$W5""$N""
+}
+_wcheck
