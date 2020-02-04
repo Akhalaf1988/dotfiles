@@ -1,0 +1,82 @@
+#! /usr/bin/env bash
+# Used to check if there was any activity from any ftp/ssh user.
+
+readonly GREP='/bin/grep'
+readonly AWK='/bin/awk'
+readonly ECHO='/bin/echo'
+readonly CUT='/bin/cut'
+readonly PWD='/bin/pwd'
+readonly LS='/bin/ls'
+readonly LAST='/usr/bin/last'
+readonly HEAD='/usr/bin/head'
+
+_domchk(){
+
+P="$(pwd| cut -d/ -f4)"
+V="$("$LS" /etc/httpd/conf.d/ \
+| "$GREP" vhost_"$P".conf)"
+
+if [[ -z "$V" ]]; then
+  "$ECHO" "Out of doc root"
+else
+    _chk
+fi
+}
+
+
+_chk(){
+D="$(pwd | cut -d/ -f4)"
+U="$(pwd | cut -d/ -f3)"
+L="$(for x in \
+$(sudo siteworx -u --login_domain="$D" -c DomainsSlave -a list); \
+do sudo siteworx -u --login_domain="$x" -c Ftp -a listFtpAccounts; done \
+| awk '{print $4}')"
+
+"$ECHO" "Users who logged in via ftp or sftp"
+for y in $("$ECHO" "$L"); \
+do "$GREP" "$y" /var/log/proftpd/auth.log \
+| "$AWK" '{print $1, $2, $6, $7, $8, $9, $10}'; done
+
+"$ECHO" "Users who logged in via ssh"
+
+"$LAST" | "$HEAD" | "$GREP" "$U"
+
+}
+
+_domchk1(){
+
+P="$(pwd | cut -d/ -f4)"
+V="$("$LS" /etc/httpd/conf.d/ \
+| "$GREP" vhost_"$P".conf)"
+
+if [[ -z "$V" ]]; then
+  "$ECHO" "Out of doc root"
+else
+    _chkdeep
+fi
+}
+
+_chkdeep(){
+D="$(pwd | cut -d/ -f4)"
+U="$(pwd | cut -d/ -f3)"
+L="$(for x in \
+$(sudo siteworx -u --login_domain="$D" -c DomainsSlave -a list); \
+do sudo siteworx -u --login_domain="$x" -c Ftp -a listFtpAccounts; done \
+| awk '{print $4}')"
+
+"$ECHO" "Users who logged in via ftp or sftp"
+for y in $("$ECHO" "$L"); \
+do "$GREP" "$y" /var/log/proftpd/auth.log* \
+| "$AWK" '{print $1, $2, $6, $7, $8, $9, $10}'; done
+
+"$ECHO" "Users who logged in via ssh"
+
+"$LAST" | "$HEAD" | "$GREP" "$U"
+}
+
+
+if [[ "$1" == "-D" ]]; then
+    _domchk1
+else
+    _domchk
+fi
