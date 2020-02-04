@@ -1,0 +1,85 @@
+#! /usr/bin/env bash
+
+##check to see if you are in a domain folder
+_domchk (){
+D="$(pwd | grep -Po '^/((chroot/)?home/|local/)[^/]*/\K[^/]*')"
+V="$(ls /etc/httpd/conf.d/ | grep "vhost_"$D".conf")"
+  if [[ -n "$V" ]]; then
+    DOM="$D"
+    _uask
+else
+    echo "What is the Master Domain?: "
+    read DOM
+    _vhostchk
+  fi
+}
+
+_vhostchk(){
+V="$(ls /etc/httpd/conf.d/ | grep "vhost_"$DOM".conf")"
+  if [[ -z "$V" ]]; then
+     echo "No Domain Found"
+     _domchk
+else
+     _uask
+  fi
+}
+
+
+_uask(){
+
+   echo "user?"
+   read U
+   _pass
+}
+
+
+
+_pass(){
+
+   echo "password? (default: xkcd):"
+   read PW
+  if [ -z "$PW" ]; then
+       PW="$(xkcd)"
+       _addftp
+else
+       PW="$PW"
+       _addftp
+fi
+}
+
+_addftp(){
+sudo siteworx -u --login_domain="$DOM" -n -c Ftp -a add --user "$U" --password "$PW" --confirm_password "$PW"
+          cat <<- EOF
+  Username: $U@$DOM
+  Password: $PW
+
+EOF
+}
+
+_helpsec(){
+          cat <<- EOF
+  Useage: ftp Argument: ex ftp -l
+
+        Supported arguments
+
+        -a|--add     adds ftp user
+        -l|--list    lists all current ftp users
+        -h|--help    displays this message
+EOF
+}
+_listftp(){
+
+DOM="$(pwd | cut -d/ -f4)"
+sudo siteworx -u --login_domain="$DOM" -c Ftp -a listFtpAccounts | awk '{print $4, $5}'
+}
+
+
+if [[ "$1" == "-l" ]] || [[ "$1" == "--list" ]]; then
+     _listftp
+else
+ if [[ "$1" == "-a" ]] || [[ "$1" == "--add" ]]; then
+     _domchk
+else
+     _helpsec
+ fi
+fi
