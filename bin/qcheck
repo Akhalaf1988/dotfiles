@@ -1,10 +1,23 @@
 #! /usr/bin/env bash
 
-#! /usr/bin/env bash
-_qcheck(){
-for x in $(~iworx/bin/listaccounts.pex \
-| awk '{print $1}'); do sudo quota -sg $x; done \
-| grep -B2 "*" | grep -v File | awk '{print $2, $3, $4, $5}' \
-| sed -e 's/quotas for group //g' | awk '{print $1, $2}'
+readonly AWK='/bin/awk'
+readonly GREP='/bin/grep'
+
+U="$(~iworx/bin/listaccounts.pex | awk '{print $1}')"
+D="$(for i in {1..23}; do echo -n "-"; done)"
+R="$(for x in $(~iworx/bin/listaccounts.pex | "$AWK" '{print $1}'); \
+do sudo quota -sg "$x"; done | "$GREP" "/dev" | "$AWK" '{print $2, $3}')"
+L="$(echo ""$R"" | "$GREP" "*")"
+
+_getquota(){
+echo "Over Quota"
+echo "$D"
+paste -d ' | ' <("$ECHO" "$U") <("$ECHO" "$R") | "$GREP" "*"
+echo "$D"
 }
-_qcheck
+
+if [[ -z "$L" ]]; then
+     echo ""
+  else
+     _getquota
+fi
