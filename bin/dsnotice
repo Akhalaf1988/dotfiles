@@ -1,0 +1,21 @@
+#! /usr/bin/env bash
+
+
+USER="$(pwd | cut -d/ -f3)"
+U="$(echo "$(quota -g "$USER" | tail -n1 | awk '{printf" %10.3f%",($2/$3*100)}')" | sed -e 's/\ //g')"
+H="$(echo; printf "%8s %12s %14s %14s\n" "Used(%)" "Used(G)" "Total(G)")"
+T="$(quota -g "$USER"| tail -n1 | awk '{printf " %10.3f%%  %10.3f GB  %10.3f GB",($2/$3*100),($2/1000/1024),($3/1000/1024)}')"
+
+if [[ "$U" > "80" ]]; then
+echo "This is a notice that you are above 80% of your available diskspace on your server $(hostname). 
+If you would like more information please email support@nexcess.net or open a support ticket from your
+portal account at portal.nexcess.net.
+
+"$H"
+"$T"
+
+~Regards
+Nexcess Support" | mail -s "Low DiskSpace!" example@example.com
+else
+echo ""
+fi
