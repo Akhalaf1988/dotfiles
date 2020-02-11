@@ -1,0 +1,41 @@
+#! /usr/bin/env bash
+
+readonly LS='/bin/ls'
+readonly ECHO='/bin/echo'
+readonly GREP='/bin/grep'
+
+_domchk (){
+D="$(pwd | cut -d/ -f4)"
+V="$("$LS" /etc/httpd/conf.d/ \
+| "$GREP" "vhost_"$D".conf")"
+  if [[ -n "$V" ]]; then
+    DOM="$D"
+    _worxusers
+else
+    "$ECHO" "What is the Master Domain?: "
+    read DOM
+    _vhostchk
+  fi
+}
+
+_vhostchk(){
+V="$("$LS" /etc/httpd/conf.d/ \
+| "$GREP" "vhost_"$DOM".conf")"
+  if [[ -z "$V" ]]; then
+     "$ECHO" "No Domain Found"
+     _domchk
+else
+     _worxusers
+  fi
+}
+
+_worxusers(){
+H="$(hostname)"
+"$ECHO" "
+https://"$H":2443/siteworx/?domain="$DOM"
+"
+"$ECHO" "Email address"
+siteworx -u --login_domain="$DOM" -n -c Users -a listUsers \
+| awk '{print $2}'
+}
+_domchk
