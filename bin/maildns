@@ -1,0 +1,135 @@
+#! /usr/bin/env bash
+
+readonly CAT='/bin/cat'
+readonly AWK='/bin/awk'
+readonly ECHO='/bin/echo'
+readonly DIG='/usr/bin/dig'
+readonly EGREP='/bin/egrep'
+readonly GREP='/bin/grep'
+readonly CUT='/bin/cut'
+readonly LS='/bin/ls'
+
+_main(){
+D="$(pwd | cut -d/ -f4)"
+V="$("$LS" /etc/httpd/conf.d/ \
+| "$GREP" "vhost_"$D".conf")"
+  if [[ -n "$V" ]]; then
+    DOM="$D"
+    LD="$(sudo siteworx -u  --login_domain="$DOM" -n \
+-c EmailRemotesetup -a listLocalDeliveryStatus \
+| "$EGREP" ^"$DOM" | "$AWK" '{print $5}')"
+    _records
+else
+    "$ECHO" "What is the Domain?: "
+    read DOM
+    _vhostchk
+  fi
+}
+
+_vhostchk(){
+V="$("$LS" /etc/httpd/conf.d/ \
+| "$GREP" "vhost_"$DOM".conf")"
+  if [[ -z "$V" ]]; then
+     "$ECHO" "No Domain Found by that name"
+     _main
+else
+      LD="$(sudo siteworx -u  --login_domain="$DOM" -n \
+-c EmailRemotesetup -a listLocalDeliveryStatus \
+| "$EGREP" ^"$DOM" | "$AWK" '{print $5}')"
+      _records
+  fi
+}
+
+_maintemp(){
+D="$(pwd | cut -d/ -f4)"
+V="$("$LS" /etc/httpd/conf.d/ \
+| "$GREP" "vhost_"$D".conf")"
+  if [[ -n "$V" ]]; then
+    DOM="$D"
+    LD="$(sudo siteworx -u  --login_domain="$DOM" -n \
+-c EmailRemotesetup -a listLocalDeliveryStatus \
+| "$EGREP" "nextmp" | "$AWK" '{print $5}')"
+    _records
+else
+    "$ECHO" "What is the Domain?: "
+    read DOM
+    _vhostchktemp
+  fi
+}
+
+_vhostchktemp(){
+V="$("$LS" /etc/httpd/conf.d/ \
+| "$GREP" "vhost_"$DOM".conf")"
+  if [[ -z "$V" ]]; then
+     "$ECHO" "No Domain Found by that name"
+     _maintemp
+else
+      LD="$(sudo siteworx -u  --login_domain="$DOM" -n \
+-c EmailRemotesetup -a listLocalDeliveryStatus \
+| "$EGREP" "nextmp" | "$AWK" '{print $5}')"
+      _records
+  fi
+}
+
+_records(){
+if [[ "$LD" == "1" ]]; then
+
+   "$ECHO" "MailStatus
+---------------------
+Local Delivery Enabled"
+else
+   "$ECHO" "Mailstatus
+---------------------
+Local Delivery Disabled"
+fi
+
+DNSER="8.8.8.8"
+MX="$("$DIG" +short mx "$DOM" @"$DNSER")"
+DMX="$(for x in $("$DIG" +short mx "$DOM"); \
+do "$DIG" +short "$x"; done)"
+SPF="$("$DIG" +short "$DOM" txt @"$DNSER" \
+| "$GREP" "v=spf1")"
+NS="$("$DIG" +short "$DOM" ns @"$DNSER")"
+
+   "$CAT" <<- EOF
+
+Mx:
+$MX
+Digmx:
+$DMX
+SPF:
+$SPF
+Nameserver:
+$NS
+
+EOF
+}
+
+_helpsec(){
+
+   "$CAT" <<- EOF
+
+Can be ran from anywhere if domain is specified.
+If you are in the domains root directory it will assume that domain.
+
+Usage: mailstatus
+
+         Supported options
+
+         -t|--temp  Checks if Temp domain is enabled or disabled.
+         -h|--help  Shows this message
+
+EOF
+}
+if [[ "$1" == "-t" \
+|| "$1" == "--t" \
+|| "$1" == "--temp" ]]; then
+     _maintemp
+else
+if [[ "$1" == "-h" \
+|| "$1" == "--help" ]]; then
+   _helpsec
+else
+     _main
+ fi
+fi
