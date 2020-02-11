@@ -1,0 +1,50 @@
+#! /usr/bin/env bash
+
+_domchk() {
+U="$(pwd | cut -d/ -f4)"
+G="$(ls /etc/httpd/conf.d/ \
+| grep "vhost_"$U".conf")"
+
+  if [[ -n "$G" ]]; then
+    DOM="$U"
+    _hostchk
+else
+    echo -n "Domain: "
+    read DOM
+    _vhostchk
+  fi
+}
+
+_vhostchk(){
+G="$(ls /etc/httpd/conf.d/ \
+| grep "vhost_"$DOM".conf")"
+
+  if [[ -z "$G" ]]; then
+     echo "No domain found"
+     _domchk
+else
+     _hostchk
+  fi
+}
+
+_hostchk(){
+H="$(echo "$(hostname)" | sed 's/.*\(.........\)/\1/')"
+if [[ "$H" == "nxcli.net" ]]; then
+  _ipcheckc
+ else
+   _ipcheck
+fi
+}
+
+_ipcheck(){
+head -n1 /etc/httpd/conf.d/vhost_"$DOM".conf | awk '{print $2}' | sed 's/\:80>//g'
+}
+_ipcheckc(){
+dig +short "$(hostname)"
+}
+H="$(echo "$(hostname)" | sed 's/.*\(.........\)/\1/')"
+if [[ "$H" == "nxcli.net" ]]; then
+  _ipcheckc
+ else
+   _domchk
+fi
