@@ -1,0 +1,13 @@
+#! /usr/bin/env bash
+
+U="$(pwd | cut -d/ -f3)"
+
+_findphp(){
+F="$(find {/etc/opt/remi/php*,{/opt/nexcess/php*/root,}/etc}/php-fpm.d/ -name "${U}.conf" ! -empty 2> /dev/null | head -n1)"
+if [[ -z "$F" ]]; then
+   echo "Could not locate phpconf"
+else
+   vim -n "$F"
+fi
+}
+_findphp
