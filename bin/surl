@@ -1,0 +1,31 @@
+#! /usr/bin/env bash
+
+function _domchk(){
+D="$(pwd | grep -Po '^/((chroot/)?home/|local/)[^/]*/\K[^/]*')"
+V="$(ls /etc/httpd/conf.d/ | grep "vhost_"$D".conf")"
+  if [[ -n "$V" ]]; then
+    DOM="$D"
+    _url
+else
+    echo "What is the Master Domain?: "
+    read DOM
+    _vhostchk
+  fi
+}
+
+function _vhostchk(){
+V="$(ls /etc/httpd/conf.d/ | grep "vhost_"$DOM".conf")"
+  if [[ -z "$V" ]]; then
+     echo "No Domain Found"
+     _domchk
+else
+     _url
+  fi
+}
+
+_url(){
+H="$(hostname)"
+echo "https://"$H":2443/siteworx/?domain="$DOM""
+}
+
+_domchk
