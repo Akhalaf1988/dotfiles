@@ -8,7 +8,7 @@ V="$(ls /etc/httpd/conf.d/ \
   if [[ -n "$V" ]]; then
     DOM="$D"
 else
-    echo "What is the Master Domain?: "
+    echo -n "Master Domain: "
     read DOM
     _vhostchk
   fi
@@ -24,7 +24,7 @@ V="$(ls /etc/httpd/conf.d/ \
   fi
 }
 _userinfo(){
-   echo "User?"
+   echo -n "User?"
    read U
    _userchk
 }
@@ -63,9 +63,10 @@ N="$(seq 99 | sort -R | tail -n1)"
  echo ""$W1""$W2""$W3""$W""$W5""$N""
 }
 _passinfo(){
-   echo "password? (defualt random)"
+   echo -n "password: "
    read PW
  if [ -z "$PW" ]; then
+   echo "Using random"
    PW="$(_xkcd)"
 else
    PW="$PW"
@@ -76,7 +77,7 @@ _adduser1(){
 R="$(siteworx -u --login_domain="$DOM" \
 -n -c overview -a listAccountDetails \
 | head -n1 | awk '{print $2}')"
-echo "what is the DB name?"
+echo -n "DB: "
   read DB1
 
 echo "adding user"
@@ -141,11 +142,11 @@ Usage: uadd argument ex. uadd -a
 
          supported aruguments
 
-         -a|--add     Will add user to all db's
+         -a|--add     Will add a user and configure it to all db's
          -h|--help    Will display this message
-         -l|--list    Will list all current mysql user
+         -l|--list    Will list all mysql users
          -n|--none    Will only add the user
-         -o|--one     Will configure the user to one db
+         -o|--one     Will add a user and connect it to one db
 
             Note: No need to add the unix user portion to the name.
 
