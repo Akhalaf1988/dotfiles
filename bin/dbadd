@@ -4,7 +4,6 @@ _domchk(){
 D="$(pwd | cut -d/ -f4)"
 V="$(ls /etc/httpd/conf.d/ \
 | grep "vhost_"$D".conf")"
-
   if [[ -n "$V" ]]; then
     DOM="$D"
 else
@@ -17,32 +16,37 @@ else
 _vhostchk(){
 V="$(ls /etc/httpd/conf.d/ \
 | grep "vhost_"$DOM".conf")"
-
   if [[ -z "$V" ]]; then
      echo "No Domain Found"
      _domchk
   fi
 }
-_userinfo(){
-   echo -n "User?"
-   read U
-   _userchk
-}
 
-_userchk(){
-I="$(pwd | cut -d/ -f3)"
-C="$(sudo siteworx -u --login_domain="$DOM" \
--c MysqlUser -n -a listMysqlUsers | awk '{print $2}'| grep ""$I"$U"$)"
+_dbinfo(){
+R="$(siteworx -u --login_domain="$DOM" -n \
+-c overview -a listAccountDetails \
+| head -n1 | awk '{print $2}')"
 
-if [[ -z "$C" ]]; then
-_passinfo
+   echo -n "DB: "
+   read DB
+J="$(echo "$DB" | grep "$R")"
+if [[ -n "$J" ]]; then
+DB="$(echo "$DB" | cut -d_ -f2)"
 else
-echo "User exists"
-_userinfo
+DB="$(echo "$DB")"
 fi
 }
-
-_xkcd(){
+_dbuinfo(){
+   echo -n "User: "
+   read U
+Y="$(echo "$U" | grep "$R")"
+if [[ -n "$Y" ]]; then
+U="$(echo "$U" | cut -d_ -f2)"
+else
+U="$(echo "$U")"
+fi
+}
+_pwg(){
 if [[ -e /usr/local/interworx/lib/dict/words ]]; then
 
     D='/usr/local/interworx/lib/dict/words';
@@ -52,7 +56,6 @@ else
    _getpass
 fi
 }
-
 _getpass(){
 W1="$(shuf -n1000 "$D" | head -n1 | sed -e 's|["'\'']||g')"
 W2="$(shuf -n1000 "$D" | tail -n1 | sed -e 's|["'\'']||g')"
@@ -63,115 +66,95 @@ N="$(seq 99 | sort -R | tail -n1)"
  echo ""$W1""$W2""$W3""$W""$W5""$N""
 }
 _passinfo(){
-   echo -n "password: "
+echo -n "New password (default: random): "
    read PW
  if [ -z "$PW" ]; then
-   echo "Using random"
-   PW="$(_xkcd)"
+  PW="$(_pwg)"
 else
    PW="$PW"
  fi
 }
+_adddbpu(){
 
-_adduser1(){
-R="$(siteworx -u --login_domain="$DOM" \
--n -c overview -a listAccountDetails \
-| head -n1 | awk '{print $2}')"
-echo -n "DB: "
-  read DB1
-
-echo "adding user"
-sudo siteworx -u --login_domain="$DOM" \
--c MysqlUser -n -a add --name "$U" \
---password "$PW" --confirm_password "$PW"
-siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name "$DB1" --user "$U" --perms all
+sudo siteworx -u --login_domain="$DOM" -n \
+-c MysqlDb -a add --name "$DB" --create_user 1 \
+--user "$U" --password "$PW" \
+--confirm_password "$PW"
 
 echo "
-Database: "$R"_"$DB1"
-Username: "$R"_"$U"
-password: "$PW""
+New DB credentials
 
+DB:   "$R"_"$DB""
+echo "User: "$R"_"$U""
+echo "Pass: "$PW"
+
+"
 }
+_dbuinfoe(){
 
-_adduserall(){
-D="$(siteworx -u --login_domain="$DOM" \
--c MysqlDb -a list | awk '{print $1}')"
-R="$(siteworx -u --login_domain="$DOM" \
--n -c overview -a listAccountDetails \
-| head -n1 | awk '{print $2}')"
-echo "adding user ..."
-sudo siteworx -u --login_domain="$DOM" \
--c MysqlUser -n -a add --name "$U" \
---password "$PW" --confirm_password "$PW"
+sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a add --name "$DB"
 
-for x in $D; do siteworx -u --login_domain="$DOM" \
--c MysqlPerms -n -a add --name $x --user "$U" --perms all; done
-
+sudo siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name "$DB" --user "$U" --perms all
 echo "
-Username: "$R"_"$U"
-password: "$PW""
+New DB created
 
+Database: "$R"_"$DB""
+echo "DBUser:   "$R"_"$U"
+"
 }
-
-_adduser(){
-R="$(siteworx -u --login_domain="$DOM" \
--n -c overview -a listAccountDetails \
-| head -n1 | awk '{print $2}')"
-
-sudo siteworx -u --login_domain="$DOM" \
--c MysqlUser -n -a add --name "$U" \
---password "$PW" --confirm_password "$PW"
+_adddb(){
+sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a add --name "$DB"
 echo "
-Username: "$R"_"$U"
-password: "$PW""
-
+DB: "$R"_"$DB"
+"
 }
-_listusers(){
-echo "
-Users
------------"
-sudo siteworx -u --login_domain="$DOM" \
--c MysqlUser -n -a listMysqlUsers | awk '{print $2}'
+_dblist(){
+DASH="$(for i in {1..12}; do echo -n "-"; done)"
+echo "Db List"
+echo "$DASH"
+sudo siteworx -u --login_domain="$DOM" -n \
+-c MysqlDb -a listMysqlDatabases | awk '{print $2}'
 }
 
 _helpsec(){
 
-   cat <<- EOF
+cat <<- EOF
 
-Usage: uadd argument ex. uadd -a
+Usage: dbadd argument ex dbadd -a
 
-         supported aruguments
+   Supposted Aruguments
 
-         -a|--add     Will add a user and configure it to all db's
-         -h|--help    Will display this message
-         -l|--list    Will list all mysql users
-         -n|--none    Will only add the user
-         -o|--one     Will add a user and connect it to one db
-
-            Note: No need to add the unix user portion to the name.
+       -a|--add        Adds a new db
+       -e|--existing   Creates new db & adds existing user to it
+       -h|--help       Displays this message
+       -l|--list       lists all db's
+       -n|--new        Creates a new db & new user
 
 EOF
 }
-if [[ "$1" == "-o" || "$1" == "--one" ]]; then
- _domchk
- _userinfo
-_adduser1
-else
-if [[ "$1" == "-a" || "$1" == "--all" ]]; then
+if [[ "$1" == "-l" || "$1" == "--list" ]]; then
 _domchk
-_userinfo
-_adduserall
+_dblist
 else
-if [[ "$1" == "-n" || "$1" == "--none" ]]; then
+if [[ "$1" == "-a" || "$1" == "--add" ]]; then
 _domchk
-_userinfo
-_adduser
+_dbinfo
+_adddb
 else
-if [[ "$1" == "-l"  || "$1" == "--list" ]]; then
+if [[ "$1" == "-n" || "$1" == "--new" ]]; then
 _domchk
-_listusers
+_dbinfo
+_dbuinfo
+_passinfo
+_adddbpu
 else
-if [[ "$1" == "-h"  || "$1" == "--help" ]]; then
+if [[ "$1" == "-e" || "$1" == "--existing" ]]; then
+_domchk
+_dbinfo
+_dbuinfo
+_dbuinfoe
+else
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
 _helpsec
 else
 _helpsec
