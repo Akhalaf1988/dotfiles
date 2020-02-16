@@ -8,39 +8,26 @@ readonly MKDIR="/bin/mkdir"
 readonly TAIL="/usr/bin/tail"
 
 _makedir(){
+W="$("$LS" -a | "$GREP" .well-known | awk '{print $9}')"
+U="$(pwd | sed 's/\/chroot//g' | cut -d/ -f3)"
+
 if [[ -z "$W" ]]; then
-sudo -u "$U" "$MKDIR" -p .well-known/pki-validation \
-&& "$VIM" .well-known/pki-validation/"$F"
+sudo -u "$U" "$MKDIR" -p .well-known/pki-validation && sudo -u "$U" "$VIM" .well-known/pki-validation/"$F"
 else
-P="$(sudo -u "$U" "$LS" .well-known \
-| "$GREP" pki-validation)"
+P="$("$LS" .well-known | "$GREP" pki-validation | awk '{print $9}')"
+
    if [[ -z "$P" ]]; then
-   sudo -u "$U" "$MKDIR" -p .well-known/pki-validation \
-&& "$VIM" .well-known/pki-validation/"$F"
+   sudo -u "$U" "$MKDIR" -p .well-known/pki-validation && sudo -u "$U" "$VIM" .well-known/pki-validation/"$F"
 else
-sudo -u "$U" "$VIM" .well-known/pki-validation/"$F"
+   sudo -u "$U" "$VIM" .well-known/pki-validation/"$F"
   fi
  fi
 }
 
-if [[ -z "$@" ]]; then
-    read -p "File Name?: " F;
-    else
-        F="$@";
-    fi;
-W="$("$LS" -a \
-| "$GREP" .well-known)"
-U="$(pwd \
-| cut -d/ -f3)"
-T="$(ls -la \
-| "$GREP" .well-known \
-| "$AWK" '{print $3}' \
-| "$TAIL")"
-
-
-if [[ "$T" == "root" ]]; then
-chown -R "$U". .well-known
-   _makedir
-else
-   _makedir
-fi
+if [[ -z "$1" ]]; then
+    read -p "File Name: " F;
+    _makedir
+ else
+    F="$1";
+    _makedir
+fi;
