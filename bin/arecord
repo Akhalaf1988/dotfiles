@@ -10,8 +10,20 @@ G="$(ls /etc/httpd/conf.d/ \
     echo -n "
 "$U" " && head -n1 /etc/httpd/conf.d/vhost_"$DOM".conf | awk '{print $2}' | sed 's/\:80>//g'
 else
+_domchk2
+fi
+}
+
+_domchk2(){
     echo -n "Domain: "
     read DO
+_domchk3
+}
+_domchk3(){
+if [[ -z "$DO" ]]; then
+ echo "No domain given"
+  _domchk2
+else
   _vhostchk
 fi
 }
