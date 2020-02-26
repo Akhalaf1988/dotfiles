@@ -1,0 +1,60 @@
+#! /usr/bin/env bash
+
+_domchk() {
+U="$(pwd | cut -d/ -f4)"
+G="$(ls /etc/httpd/conf.d/ \
+| grep "vhost_"$U".conf")"
+
+  if [[ -n "$G" ]]; then
+    DOM="$U"
+    echo -n "
+"$U" " && head -n1 /etc/httpd/conf.d/vhost_"$DOM".conf | awk '{print $2}' | sed 's/\:80>//g'
+else
+    echo -n "Domain: "
+    read DO
+  _vhostchk
+fi
+}
+
+_vhostchk(){
+
+S="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | wc -l)"
+R="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | tail -n1)"
+  if [[ "$S" == "1" ]]; then
+DOM="$R"
+echo -n "
+"$R" " && head -n1 /etc/httpd/conf.d/vhost_"$DOM".conf | awk '{print $2}' | sed 's/\:80>//g'
+else
+echo "
+Domain ambiguous
+"
+_domlist
+fi
+}
+
+_domlist(){
+ls -l /etc/httpd/conf.d/ | awk '{print $9}' | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | nl
+
+echo -n "
+Choose Domain: "
+read P
+Q="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | nl | grep "     $P" | awk '{print $2}')"
+DOM="$Q"
+echo -n "
+"$Q" " && head -n1 /etc/httpd/conf.d/vhost_"$DOM".conf | awk '{print $2}' | sed 's/\:80>//g'
+}
+
+_ipcheckc(){
+dig +short "$(hostname)"
+}
+H="$(echo "$(hostname)" | sed 's/.*\(.........\)/\1/')"
+if [[ "$H" == "nxcli.net" ]]; then
+  _ipcheckc
+ else
+if [[ -n "$1" ]]; then
+DO="$1"
+_vhostchk
+else
+   _domchk
+ fi
+fi
