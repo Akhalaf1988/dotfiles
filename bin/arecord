@@ -30,8 +30,8 @@ fi
 
 _vhostchk(){
 
-S="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | wc -l)"
-R="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | tail -n1)"
+S="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | wc -l)"
+R="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | tail -n1)"
   if [[ "$S" == "1" ]]; then
 DOM="$R"
 echo -n "
@@ -45,12 +45,12 @@ fi
 }
 
 _domlist(){
-ls -l /etc/httpd/conf.d/ | awk '{print $9}' | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | nl
+ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | nl
 
 echo -n "
 Choose Domain: "
 read P
-Q="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | nl | grep "     $P" | awk '{print $2}')"
+Q="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | nl | grep "     $P" | awk '{print $2}')"
 DOM="$Q"
 echo -n "
 "$Q" " && head -n1 /etc/httpd/conf.d/vhost_"$DOM".conf | awk '{print $2}' | sed 's/\:80>//g'
