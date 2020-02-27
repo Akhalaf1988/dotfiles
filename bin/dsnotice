@@ -2,7 +2,7 @@
 
 
 USER="$(pwd | cut -d/ -f3)"
-U="$(echo "$(quota -g "$USER" | tail -n1 | awk '{printf " %10.1f%",($2/$3*100)}')" | sed -e 's/%//g')"
+U="$(echo "$(quota -g "$USER" | tail -n1 | awk '{printf " %10.1f%",($2/$3*100)}' | sed -e 's/%//g')"
 H="$(echo; printf " %8s %12s %14s\n" "Used(%)" "Used(G)" "Total(G)")"
 T="$(quota -g "$USER"| tail -n1 | awk '{printf " %10.1f%%  %10.1f GB  %10.1f GB",($2/$3*100),($2/1000/1024),($3/1000/1024)}')"
 
