@@ -29,23 +29,59 @@ R="$(siteworx -u --login_domain="$DOM" -n \
 
    echo -n "DB: "
    read DB
+_dbinfoUchk
+}
+_dbinfoUchk(){
 J="$(echo "$DB" | grep "$R")"
 if [[ -n "$J" ]]; then
-DB="$(echo "$DB" | cut -d_ -f2)"
+DB="$(echo "$DB" | cut -d_ -f2,3)"
+_dbinfoLchk
 else
 DB="$(echo "$DB")"
+_dbinfoLchk
 fi
 }
+_dbinfoLchk(){
+W="$(echo "$DB" | wc -m)"
+if [[ "$W" -gt 8 ]]; then
+echo "Character length exceeded"
+_dbinfo
+else
+_dbinfoEchk
+fi
+}
+_dbinfoEchk(){
+E="$(sudo siteworx -u --login_domain="$DOM" -n \
+-c MysqlDb -a listMysqlDatabases | awk '{print $2}' | grep $DB)"
+if [[ -n "$E" ]]; then
+echo "DB exists"
+_dbinfo
+fi
+}
+
 _dbuinfo(){
    echo -n "User: "
    read U
+_dbuinfoUchk
+}
+_dbuinfoUchk(){
 Y="$(echo "$U" | grep "$R")"
 if [[ -n "$Y" ]]; then
-U="$(echo "$U" | cut -d_ -f2)"
+U="$(echo "$U" | cut -d_ -f2,3)"
+_dbuinfoLchk
 else
 U="$(echo "$U")"
+_dbuinfoLchk
 fi
 }
+_dbuinfoLchk(){
+W1="$(echo "$U" | wc -m)"
+if [[ "$W1" -gt 8 ]]; then
+echo "Character length exceeded"
+_dbuinfo
+fi
+}
+
 _pwg(){
 if [[ -e /usr/local/interworx/lib/dict/words ]]; then
 
@@ -125,10 +161,10 @@ Usage: dbadd argument ex dbadd -a
    Supposted Aruguments
 
        -a|--add        Adds a new db
-       -e|--existing   Creates new db & adds existing user to it
+       -e|--existing   Creates new db adds existing user to it
        -h|--help       Displays this message
        -l|--list       lists all db's
-       -n|--new        Creates a new db & new user
+       -n|--new        Creates a new db plus new user
 
 EOF
 }
