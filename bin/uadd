@@ -8,7 +8,7 @@ V="$(ls /etc/httpd/conf.d/ \
   if [[ -n "$V" ]]; then
     DOM="$D"
 else
-    echo "What is the Master Domain?: "
+    echo -n "Domain: "
     read DOM
     _vhostchk
   fi
@@ -32,8 +32,10 @@ R="$(siteworx -u --login_domain="$DOM" -n \
 J="$(echo "$U" | grep "$R")"
 if [[ -n "$U" ]]; then
 U="$(echo "$U" | cut -d_ -f2)"
+_userchk
 else
 U="$(echo "$U")"
+_userchk
 fi
 }
 
@@ -42,13 +44,22 @@ C="$(sudo siteworx -u --login_domain="$DOM" \
 -c MysqlUser -n -a listMysqlUsers | awk '{print $2}'| grep "$R_$U$")"
 
 if [[ -z "$C" ]]; then
-_passinfo
+_userchecklengh
 else
 echo "User exists!"
 _userinfo
  fi
 }
 
+_userchecklengh(){
+W="$(echo "$U" | wc -m)"
+if [[ "$W" -gt 8 ]]; then
+echo "Character length exceeds 7"
+_userinfo
+else
+_passinfo
+fi
+}
 _pwg(){
 if [[ -e /usr/local/interworx/lib/dict/words ]]; then
 
@@ -80,25 +91,31 @@ else
 }
 
 _adduser1(){
+R="$(siteworx -u --login_domain="$DOM" -n \
+-c overview -a listAccountDetails \
+| head -n1 | awk '{print $2}')"
 echo -n "DB: "
   read DB1
-J="$(echo "$DB1" | grep "$R")"
-if [[ -n "$J" ]]; then
-DB="$(echo "$DB1" | cut -d_ -f2)"
+L="$(echo "$DB1" | grep "$R")"
+if [[ -n "$L" ]]; then
+DB="$(echo "$DB1" | cut -d_ -f2,3)"
+_adduser12
 else
 DB="$(echo "$DB1")"
+_adduser12
 fi
-
+}
+_adduser12(){
 echo "adding user..."
 sudo siteworx -u --login_domain="$DOM" \
 -c MysqlUser -n -a add --name "$U" \
 --password "$PW" --confirm_password "$PW"
-siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name "$DB1" --user "$U" --perms all
+siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name "$DB" --user "$U" --perms all
 
 echo "
 User added!
 
-Database: "$R"_"$DB1"
+Database: "$R"_"$DB"
 Username: "$R"_"$U"
 password: "$PW""
 
@@ -131,7 +148,7 @@ sudo siteworx -u --login_domain="$DOM" \
 -c MysqlUser -n -a add --name "$U" \
 --password "$PW" --confirm_password "$PW"
 echo "
-User added
+User added!
 
 Username: "$R"_"$U"
 password: "$PW""
@@ -159,7 +176,7 @@ K="$(sudo siteworx -u --login_domain="$DOM" \
 -c MysqlUser -n -a listMysqlUsers | awk '{print $2}' | grep "$U")"
 
 if [[ -z "$K" ]]; then
-    echo "No user found by that name"
+    echo "No user found"
     _userinfo1
 else
     _adduseree
@@ -182,7 +199,7 @@ M="$(sudo siteworx -u --login_domain="$DOM" -n \
 -c MysqlDb -a listMysqlDatabases | awk '{print $2}' | grep "$B")"
 
 if [[ -z "$M" ]]; then
-    echo "No DB found by that name"
+    echo "No DB found"
     _adduseree
 else
     _adduserex
@@ -205,15 +222,15 @@ _helpsec(){
 
    cat <<- EOF
 
-Usage: uadd argument ex. uadd -a
+Usage: uadd argument ex. uadd -n
 
          supported aruguments
 
-         -a|--add     add new user to all db's
+         -a|--all     add new user to all db's
          -e|--exist   add an existing user to an existing db
          -h|--help    display this message
          -l|--list    list all users
-         -n|--none    add a new user
+         -n|--new     add a new user
          -o|--one     add new user to existing db
 
 EOF
@@ -221,7 +238,6 @@ EOF
 if [[ "$1" == "-o" || "$1" == "--one" ]]; then
  _domchk
  _userinfo
-_userchk
 _adduser1
 else
 if [[ "$1" == "-e" || "$1" == "--exist" ]]; then
@@ -231,13 +247,11 @@ else
 if [[ "$1" == "-a" || "$1" == "--all" ]]; then
 _domchk
 _userinfo
-_userchk
 _adduserall
 else
-if [[ "$1" == "-n" || "$1" == "--none" ]]; then
+if [[ "$1" == "-n" || "$1" == "--new" ]]; then
 _domchk
 _userinfo
-_userchk
 _adduser
 else
 if [[ "$1" == "-l"  || "$1" == "--list" ]]; then
