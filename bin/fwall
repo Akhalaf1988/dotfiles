@@ -3,78 +3,126 @@
 readonly AWK='/bin/awk'
 readonly CAT='/bin/cat'
 readonly CUT='/bin/cut'
-readonly ECHO='/bin/echo'
 readonly GREP='/bin/grep'
 readonly LS='/bin/ls'
 
 ### CHECK PATH ###
-_domchk() {
-D="$(pwd | "$CUT" -d/ -f4)"
-V="$("$LS" /etc/httpd/conf.d/ \
-| "$GREP" "vhost_"$D".conf")"
+_domchk ()
+{
+    D="$(pwd | "$CUT" -d/ -f4)";
+    V="$("$LS" /etc/httpd/conf.d/ | "$GREP" "vhost_"$D".conf")";
 
-  if [[ -n "$V" ]]; then
-    DOM="$D"
-    _askIP
-else
-    "$ECHO" "What is the Master Domain?: "
-    read DOM
-    _vhostchk
-  fi
+
+    if [[ -n "$V" ]]; then
+        DOM="$D";
+    else
+        _domchk2
+    fi
 }
 
-_vhostchk (){
-V="$("$LS" /etc/httpd/conf.d/ \
-| "$GREP" "vhost_"$DOM".conf")"
-
-  if [[ -z "$V" ]]; then
-     "$ECHO" "No Domain Found"
-     _domchk
-else
-     _askIP
-  fi
+_domchk2(){
+    echo -n "Domain: "
+    read DO
+    _domchk3
 }
+_domchk3(){
+if [[ -z "$DO" ]]; then
+ echo "No domain given"
+  _domchk2
+else
+  _vhostchk
+fi
+}
+_vhostchk(){
+S="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | wc -l)"
+R="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | tail -n1)"
+if [[ -z "$R" ]]; then
+     echo "No domain found"
+     _domchk2
+else
+  if [[ "$S" == "1" ]]; then
+DOM="$R"
+echo "Using the domain "$R""
+else
+echo "
+Domain ambiguous: Choose domain
+"
+_domlist
+ fi
+fi
+}
+
+_domlist(){
+ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | nl
+
+echo -n "
+Choose Domain: "
+read P
+Q="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | nl | grep "     $P" | awk '{print $2}')"
+DOM="$Q"
+}
+
 
 _askIP(){
-   "$ECHO" "What is the IP?: "
+   echo -n "IP: "
    read IP
-   _service
+   _ipchk
 }
 
+_ipchk(){
+
+if [[ -z "$IP" ]]; then
+   echo "No IP given"
+_askIP
+fi
+}
+
+
 _service(){
-   "$ECHO" "Which Service? ssh/sftp/ftp/mysql/all?: "
+  echo -n "Service [ssh/sftp/ftp/mysql/all]: "
    read SER
-   _servicechk
 }
 
 _servicechk(){
-
+if [[ -z "$SER" ]]; then
+   echo "No service given"
+_service
+else
 if [[ "$SER" == "ssh" || "$SER" == "s" || "$SER" == "ftp" \
 || "$SER" == "f" || "$SER" == "sftp" || "$SER" == "sf" \
 || "$SER" == "mysql" || "$SER" == "m" || "$SER" == "all" \
 || "$SER" == "a" ]]; then
    _flow
 else
-   "$ECHO" "Not a supported service"
-   _service
+   echo "Not a supported option"
+  _service
+ fi
 fi
 }
 
 _flow(){
-  "$ECHO" "Connection Direction? in/out"
+  echo -n "Flow? [in/out]: "
   read FLOW
-   _flowchk
 }
-
 _flowchk(){
 if [[ "$FLOW" == "in" || "$FLOW" == "out" ]]; then
-   _addIP
+   echo -n ""
 else
-    "$ECHO" "Not supported input"
    _flow
 fi
 }
 
+_cidr(){
+  echo "cidr range: "
+  read CIDR
+_cidrchk
+}
+_cidrchk(){
+if [[ -z "$CIDR" ]]; then
+   echo "No Range given"
+_cidr
+fi
+}
 _addIP(){
 if [[ "$SER" == "ssh" || "$SER" == "s" ]]; then
    _sshadd
@@ -102,91 +150,49 @@ fi
 
 _sshadd(){
 sudo siteworx -u --login_domain="$DOM" -c firewall -n \
--a addRule --ip "$IP" --service ssh --flow "$FLOW" --cidr 32
+-a addRule --ip "$IP" --service ssh
 }
 
 _ftpadd(){
 sudo siteworx -u --login_domain="$DOM" -c firewall \
--n -a addRule --ip "$IP" --service ftp --flow "$FLOW" --cidr 32
+-n -a addRule --ip "$IP" --service ftp
 }
 
 _sftpadd(){
 sudo siteworx -u --login_domain="$DOM" -c firewall -n \
--a addRule --ip "$IP" --service sftp --flow "$FLOW" --cidr 32
+-a addRule --ip "$IP" --service sftp
 }
 
 _mysqladd(){
 sudo siteworx -u --login_domain="$DOM" -c firewall -n \
--a addRule --ip "$IP" --service mysql --flow "$FLOW" --cidr 32
+-a addRule --ip "$IP" --service mysql
 }
+##advance
+
+_sshadda(){
+sudo siteworx -u --login_domain="$DOM" -c firewall -n \
+-a addRule --ip "$IP" --service ssh --flow "$FLOW" --cidr "$CIDR"
+}
+
+_ftpadda(){
+sudo siteworx -u --login_domain="$DOM" -c firewall \
+-n -a addRule --ip "$IP" --service ftp --flow "$FLOW" --cidr "$CIDR"
+}
+
+_sftpadda(){
+sudo siteworx -u --login_domain="$DOM" -c firewall -n \
+-a addRule --ip "$IP" --service sftp --flow "$FLOW" --cidr "$CIDR"
+}
+
+_mysqladda(){
+sudo siteworx -u --login_domain="$DOM" -c firewall -n \
+-a addRule --ip "$IP" --service mysql --flow "$FLOW" --cidr "$CIDR"
+}
+
+
+
 ############################
 ############################
-
-_domchkrm() {
-D="$("$ECHO" "$PWD" | "$CUT" -d/ -f4)"
-V="$("$LS" /etc/httpd/conf.d/ \
-| "$GREP" "vhost_"$D".conf")"
-
-  if [[ -n "$V" ]]; then
-    DOM="$D"
-    _askIPRM
-else
-    "$ECHO" "What is the Master Domain?: "
-    read DOM
-    _vhostchkrm
-  fi
-}
-
-_vhostchkrm(){
-V="$("$LS" /etc/httpd/conf.d/ \
-| "$GREP" "vhost_"$DOM".conf")"
-
-  if [[ -z "$V" ]]; then
-     "$ECHO" "No Domain Found"
-     _domchkrm
-else
-     _askIPRM
-  fi
-}
-
-_askIPRM(){
-   "$ECHO" "IP?: "
-   read IP
-   _servicerm
-}
-
-_servicerm(){
-   "$ECHO" "Which service? ssh/sftp/ftp/mysql/all?: "
-   read SER
-   _servicechkrm
-}
-_servicechkrm(){
-
-if [[ "$SER" == "ssh" || "$SER" == "ftp" || "$SER" == "sftp" \
-|| "$SER" == "mysql" || "$SER" == "all" || "$SER" == "s" \
-|| "$SER" == "sf" || "$SER" == "f" || "$SER" == "m" \
-|| "$SER" == "a" ]]; then
-   _flowrm
-else
-   "$ECHO" "Not a supported service"
-   _servicerm
-fi
-}
-_flowrm(){
-  "$ECHO" "Connection direction? in/out"
-  read FLOW
-   _flowchkrm
-}
-
-_flowchkrm(){
-if [[ "$FLOW" == "in" || "$FLOW" == "out" ]]; then
-   _rmIP
-else
-   "$ECHO" "Type only in or out"
-   _flowrm
-fi
-}
-
 _rmIP(){
 if [[ "$SER" == "ssh" || "$SER" == "s" ]]; then
    _sshrm
@@ -231,34 +237,29 @@ sudo siteworx -u --login_domain="$DOM" -c Firewall -n \
 
 ################################LISTING
 _listIPS(){
-sudo siteworx -u --login_domain="$DOM" -c firewall -a listIps | awk '{print $1, $2, $7, $8}'
+
+U="$(sudo siteworx -u --login_domain="$DOM" -c firewall -a listIps | awk '{print $1, $2, $5}')"
+R="$(sudo siteworx -u --login_domain="$DOM" -c firewall -a listIps | awk '{print $6, $7, $8, $9, $10, $11, $12, $13}' | grep -Eo "([0-9]{1,3}[\.]){3}[0-9]{1,3}")"
+echo "Firewall Summary: "$DOM"
+------------------------------"
+paste -d ' | '  <(echo "$U")  <(echo "$R") | column -t
 }
 
-_domchkl(){
-D="$(pwd | "$CUT" -d/ -f4)"
-V="$("$LS" /etc/httpd/conf.d/ \
-| "$GREP" "vhost_"$D".conf")"
-
-  if [[ -n "$V" ]]; then
-    DOM="$D"
-    _listIPS
-else
-    "$ECHO" "What is the Master Domain?: "
-    read DOM
-    _vhostchkl
-  fi
+_add(){
+_domchk
+_askIP
+_service
+_servicechk
+_flowchk
+_addIP
 }
-
-_vhostchkl(){
-V="$("$LS" /etc/httpd/conf.d/ \
-| "$GREP" "vhost_"$DOM".conf")"
-
-  if [[ -z "$V" ]]; then
-     "$ECHO" "No Domain Found"
-     _domchkl
-else
-     _listIPS
-  fi
+_rm(){
+_domchk
+_askIP
+_service
+_servicechk
+_flowchk
+_rmIP
 }
 
 _helpsec(){
@@ -269,10 +270,10 @@ Usage: fwall arugument: ex: fwall -r
 
          Supported Aruguments:
 
-         -a|--add      adds a given ipaddress
-         -r|--remove   removes a given ipaddress
+         -a|--add      adds an ip
+         -r|--remove   removes an ip
          -h|--help     shows this message
-         -l|--list     lists all current whitelisted ips
+         -l|--list     lists all ips whitelisted
 
 Used to check if an ip address is whitelisted and can be used to whitelist one or remove one.
 If you are outside of the doc root it will ask for a domain otherwise it
@@ -282,20 +283,20 @@ Needs to know the flow direction, can only type in or out in that section.
 
 EOF
 }
-
 if [[ "$1" == "-l" || "$1" == "--list" ]]; then
-  _domchkl
+_domchk
+_listIPS
 else
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-  _helpsec
+   _helpsec
 else
 if [[ "$1" == "-r" || "$1" == "--remove" ]]; then
-  _domchkrm
+   _rm
 else
 if [[ "$1" == "-a" || "$1" == "--add" ]]; then
-  _domchk
+   _add
 else
-  _helpsec
+ _add
    fi
   fi
  fi
