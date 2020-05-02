@@ -67,7 +67,7 @@ _dbinfoEchk(){
 E="$(sudo siteworx -u --login_domain="$DOM" -n \
 -c MysqlDb -a listMysqlDatabases | awk '{print $2}' | grep $DB$)"
 if [[ -n "$E" ]]; then
-echo -e ""$RED"DB exists"$NC""
+echo -e ""$RED"DB exists!"$NC""
 _dbinfo
 fi
 }
@@ -91,7 +91,7 @@ UC="$(sudo siteworx -u --login_domain="$DOM" \
 -c MysqlUser -n -a listMysqlUsers | awk '{print $2}' | grep $U$)"
 
 if [[ -n "$UC" ]]; then
-echo -e ""$RED"User exists"$NC""
+echo -e ""$RED"User exists!"$NC""
 _dbuinfo
 else
 _dbuinfoUchk
@@ -360,9 +360,8 @@ password: "$PW""
 _dblist(){
 echo "Db list"
 echo "$DASH"
-sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a listMysqlDatabases | awk '{print $2}'
+sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a listMysqlDatabases | awk '{print $2, $4, $5}' | column -t
 }
-
 ##########List all users##########
 _listusers(){
 echo "Users list"
@@ -379,16 +378,16 @@ Usage: mql -flag
 
    Supported Aruguments
 
-      -uad|--add-uadbs      Add a user to all dbs
-       -ad|--add-db         Add a new db
-       -au|--add-user       Add new user
-       -ed|--add-uxd        Add new user to existing db
-      -eud|--add-xuxd       Add an existing user to an existing db
-       -eu|--add-xud        Add an existing user to new db
+      -uad|--uadbs          Add a user to all dbs
+       -ad|--db             Add a new db
+       -au|--user           Add new user
+       -ed|--uxd            Add new user to existing db
+      -eud|--xuxd           Add an existing user to an existing db
+       -eu|--xund           Add an existing user to new db
         -h|--help           Displays this message
        -ld|--listdbs        lists all dbs
        -lu|--listusers      lists all users
-      -nud|--add-nund       Creates a new db plus new user
+      -nud|--nund           Creates a new db plus new user
 
 EOF
 }
@@ -396,7 +395,7 @@ if [[ "$1" == "-ld" || "$1" == "--listdbs" ]]; then
 _domchk
 _dblist
 else
-if [[ "$1" == "-eud" || "$1" == "--add-xuxd" ]]; then
+if [[ "$1" == "-eud" || "$1" == "--xuxd" ]]; then
  _domchk
  _userinfo1
 else
@@ -404,31 +403,31 @@ if [[ "$1" == "-lu" || "$1" == "--listusers" ]]; then
 _domchk
 _listusers
 else
-if [[ "$1" == "-ed" || "$1" == "--add-uxd" ]]; then
+if [[ "$1" == "-ed" || "$1" == "--uxd" ]]; then
  _domchk
  _dbuinfo
 _passinfo
 _adduser1
 else
-if [[ "$1" == "-ad" || "$1" == "--add-db" ]]; then
+if [[ "$1" == "-ad" || "$1" == "--db" ]]; then
 _domchk
 _dbinfo
 _adddb
 else
-if [[ "$1" == "-au" || "$1" == "--add-user" ]]; then
+if [[ "$1" == "-au" || "$1" == "--user" ]]; then
 _domchk
 _dbuinfo
 _passinfo
 _adduser
 else
-if [[ "$1" == "-nud" || "$1" == "--add-nund" ]]; then
+if [[ "$1" == "-nud" || "$1" == "--nund" ]]; then
 _domchk
 _dbinfo
 _dbuinfo
 _passinfo
 _adddbpu
 else
-if [[ "$1" == "-eu" || "$1" == "--add-xud" ]]; then
+if [[ "$1" == "-eu" || "$1" == "--xund" ]]; then
 _domchk
 _dbinfo
 _dbuinfoe
@@ -440,7 +439,7 @@ else
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then
 _helpsec
 else
-if [[ "$1" == "-uad" || "$1" == "--add-uadbs" ]]; then
+if [[ "$1" == "-uad" || "$1" == "--uadbs" ]]; then
 _domchk
 _dbuinfo
 _passinfo
