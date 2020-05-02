@@ -57,7 +57,7 @@ fi
 _dbinfoLchk(){
 W="$(echo "$DB" | wc -m)"
 if [[ "$W" -gt 8 ]]; then
-echo -e ""$RED"Character length of 7 exceeded"$NC""
+echo -e ""$RED"Character length of 7exceeded"$NC""
 _dbinfo
 else
 _dbinfoEchk
@@ -67,7 +67,7 @@ _dbinfoEchk(){
 E="$(sudo siteworx -u --login_domain="$DOM" -n \
 -c MysqlDb -a listMysqlDatabases | awk '{print $2}' | grep $DB$)"
 if [[ -n "$E" ]]; then
-echo -e ""$RED"DB already exists!"$NC""
+echo -e ""$RED"DB exists!"$NC""
 _dbinfo
 fi
 }
@@ -91,7 +91,7 @@ UC="$(sudo siteworx -u --login_domain="$DOM" \
 -c MysqlUser -n -a listMysqlUsers | awk '{print $2}' | grep $U$)"
 
 if [[ -n "$UC" ]]; then
-echo -e ""$RED"User already exists!"$NC""
+echo -e ""$RED"User exists!"$NC""
 _dbuinfo
 else
 _dbuinfoUchk
@@ -115,7 +115,7 @@ echo -e ""$RED"Character limit of 7 exceeded"$NC""
 _dbuinfo
 fi
 }
-############# Pass Gen ########
+
 _pwg(){
 if [[ -e /usr/local/interworx/lib/dict/words ]]; then
 
@@ -159,8 +159,7 @@ echo "Pass: "$PW"
 
 "
 }
-##############
-############## DB info for existing user ############
+#########################
 _dbuinfoe(){
 echo -n "User: "
 read U
@@ -171,9 +170,22 @@ _inputchk3(){
 if [[ -z $U ]]; then
 _dbuinfoe
 else
-_dbuinfoe1
+_chkusrexist
 fi
 }
+
+_chkusrexist(){
+
+S="$(sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a listMysqlUsers | awk '{print $2}' | grep $U$)"
+
+if [[ -z "$S" ]]; then
+    echo -e ""$RED"No user found"$NC""
+    _dbuinfoe
+else
+    _dbuinfoe1
+fi
+}
+
 _dbuinfoe1(){
 sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a add --name "$DB"
 
@@ -185,7 +197,6 @@ Database: "$R"_"$DB""
 echo "DBUser:   "$R"_"$U"
 "
 }
-################ Add single db #############
 _adddb(){
 sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a add --name "$DB"
 echo "
