@@ -57,7 +57,7 @@ fi
 _dbinfoLchk(){
 W="$(echo "$DB" | wc -m)"
 if [[ "$W" -gt 8 ]]; then
-echo -e ""$RED"Character length of 7exceeded"$NC""
+echo -e ""$RED"Character length of 7 exceeded"$NC""
 _dbinfo
 else
 _dbinfoEchk
