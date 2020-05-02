@@ -67,7 +67,7 @@ _dbinfoEchk(){
 E="$(sudo siteworx -u --login_domain="$DOM" -n \
 -c MysqlDb -a listMysqlDatabases | awk '{print $2}' | grep $DB$)"
 if [[ -n "$E" ]]; then
-echo -e ""$RED"DB exists!"$NC""
+echo -e ""$RED"DB already exists!"$NC""
 _dbinfo
 fi
 }
@@ -91,7 +91,7 @@ UC="$(sudo siteworx -u --login_domain="$DOM" \
 -c MysqlUser -n -a listMysqlUsers | awk '{print $2}' | grep $U$)"
 
 if [[ -n "$UC" ]]; then
-echo -e ""$RED"User exists!"$NC""
+echo -e ""$RED"User already exists!"$NC""
 _dbuinfo
 else
 _dbuinfoUchk
@@ -115,7 +115,7 @@ echo -e ""$RED"Character limit of 7 exceeded"$NC""
 _dbuinfo
 fi
 }
-
+############# Pass Gen ########
 _pwg(){
 if [[ -e /usr/local/interworx/lib/dict/words ]]; then
 
@@ -159,7 +159,8 @@ echo "Pass: "$PW"
 
 "
 }
-#########################
+##############
+############## DB info for existing user ############
 _dbuinfoe(){
 echo -n "User: "
 read U
@@ -184,6 +185,7 @@ Database: "$R"_"$DB""
 echo "DBUser:   "$R"_"$U"
 "
 }
+################ Add single db #############
 _adddb(){
 sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a add --name "$DB"
 echo "
