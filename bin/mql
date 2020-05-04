@@ -445,10 +445,6 @@ _domchk
 _dbinfo
 _dbuinfoe
 else
-if [[ "$1" == "-c" || "$1" == "--copy" ]]; then
-_domchk
-_DBCinfo
-else
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then
 _helpsec
 else
@@ -459,7 +455,6 @@ _passinfo
 _adduserall
 else
 _helpsec
-          fi
          fi
         fi
        fi
