@@ -6,6 +6,27 @@ RED='\033[0;31m'
 NC='\033[0m'
 BLUE='\033[1;34m'
 ###################
+_helpsec(){
+
+cat <<- EOF
+
+Usage: mql -flag
+
+   Supported Aruguments
+
+      -uad|--uadbs          Add a new user to all dbs
+       -ad|--db             Add a new db
+       -au|--user           Add new user
+       -ed|--uxd            Add new user to existing db
+      -eud|--xuxd           Add an existing user to an existing db
+       -eu|--xund           Add an existing user to new db
+        -h|--help           Displays this message
+       -ld|--listdbs        lists all dbs
+       -lu|--listusers      lists all users
+      -nud|--nund           Creates a new db plus new user
+
+EOF
+}
 #########Domain check ########
 _domchk(){
 D="$(pwd | cut -d/ -f4)"
@@ -170,6 +191,17 @@ _inputchk3(){
 if [[ -z $U ]]; then
 _dbuinfoe
 else
+_dbuinfochk
+fi
+}
+
+_dbuinfochk(){
+Y="$(echo "$U" | grep "$R")"
+if [[ -n "$Y" ]]; then
+U="$(echo "$U" | cut -d_ -f2,3)"
+_chkusrexist
+else
+U="$(echo "$U")"
 _chkusrexist
 fi
 }
@@ -382,28 +414,6 @@ echo "$DASH"
 sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a listMysqlUsers | awk '{print $2}'
 }
 
-_helpsec(){
-
-cat <<- EOF
-
-
-Usage: mql -flag
-
-   Supported Aruguments
-
-      -uad|--uadbs          Add a user to all dbs
-       -ad|--db             Add a new db
-       -au|--user           Add new user
-       -ed|--uxd            Add new user to existing db
-      -eud|--xuxd           Add an existing user to an existing db
-       -eu|--xund           Add an existing user to new db
-        -h|--help           Displays this message
-       -ld|--listdbs        lists all dbs
-       -lu|--listusers      lists all users
-      -nud|--nund           Creates a new db plus new user
-
-EOF
-}
 if [[ "$1" == "-ld" || "$1" == "--listdbs" ]]; then
 _domchk
 _dblist
@@ -445,6 +455,10 @@ _domchk
 _dbinfo
 _dbuinfoe
 else
+if [[ "$1" == "-c" || "$1" == "--copy" ]]; then
+_domchk
+_DBCinfo
+else
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then
 _helpsec
 else
@@ -455,6 +469,7 @@ _passinfo
 _adduserall
 else
 _helpsec
+          fi
          fi
         fi
        fi
