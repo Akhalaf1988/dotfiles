@@ -288,7 +288,7 @@ fi
 }
 _userinfo11(){
 J="$(echo "$U" | grep "$R")"
-if [[ -n "$U" ]]; then
+if [[ -n "$J" ]]; then
 U="$(echo "$U" | cut -d_ -f2)"
 _addusere
 else
