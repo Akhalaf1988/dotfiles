@@ -1,50 +1,104 @@
 #! /usr/bin/env bash
+## Globals ##
 
-readonly AWK='/bin/awk'
-readonly CUT='/bin/cut'
-readonly CAT='/bin/cat'
-readonly ECHO='/bin/echo'
-readonly GREP='/bin/grep'
-readonly LS='/bin/ls'
-readonly PWD='/bin/pwd'
-readonly SED='/bin/sed'
-readonly XZCAT='/usr/bin/xzcat'
-readonly ZCAT='/bin/zcat'
+RED='\033[0;31m'
+NC='\033[0m'
+BLUE='\033[1;34m'
+DASH="$(for i in {1..69}; do echo -n "-"; done)";
+##
 
-####### PATH CHECK ######
-_domchk () {
-U="$(pwd | "$CUT" -d/ -f4)"
-G="$("$LS" /etc/httpd/conf.d/ \
-| "$GREP" "vhost_"$U".conf")"
+_helpsec(){
 
-  if [[ -n "$G" ]]; then
-    varDOM="$U"
-    _mysqlchk
-else
-    "$ECHO" -n "What is the master domain: "
-    read varDOM
-    _vhostchk
-  fi
+    cat <<- EOF
+
+Help section:
+$DASH
+This script is used to import databases one after another for one user.
+
+     Usage: dbimport
+
+Enter domain or portion of domain and choose.
+Enter filename.
+Enter database.
+
+accepts xz, gz and sql extensions..
+
+If the file does not end in any of the above extensions, rename so it has appropriate ending.
+
+There are multiple ways to exit the script.
+ctrl c at anytime, q, quit, exit or stop when asked for file or database.
+can type "gofile" when asked for the database to re-enter filename and start over.
+$DASH
+
+EOF
 }
 
-_vhostchk (){
-G="$("$LS" /etc/httpd/conf.d/ \
-| "$GREP" "vhost_"$varDOM".conf")"
-
-  if [[ -z "$G" ]]; then
-     "$ECHO" "No domain found"
-     _domchk
+####### PATH CHECK ######
+_domchk() {
+U="$(pwd | cut -d/ -f4)"
+G="$(ls /etc/httpd/conf.d/ | grep "vhost_"$U".conf")"
+  if [[ -n "$G" ]]; then
+    DOM="$U"
+    _mysqlchk
 else
-     _mysqlchk
-  fi
+     _domchk2
+   fi
+}
+_domchk2(){
+    echo -n "Domain: "
+    read DO
+_domchk3
+}
+_domchk3(){
+if [[ -z "$DO" ]]; then
+  echo -e ""$RED"No domain given"$NC""
+  _domchk2
+else
+  _vhostchk
+fi
+}
+_vhostchk(){
+
+S="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | wc -l)"
+R="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | tail -n1)"
+  if [[ "$S" == "1" ]]; then
+DOM="$R"
+_mysqlchk
+else
+_domlist
+fi
+}
+_domlist(){
+CC="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | nl)"
+if [[ -z "$CC" ]]; then
+  echo -e ""$RED"Domain not found"$NC""
+else
+  echo -e ""$RED"Domain ambiguous: Choose Domain"$NC"
+"
+ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | nl
+
+ echo -n "Domain: "
+ read P
+if [[ -z "$P" ]]; then
+  _vhostchk
+else
+Q="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | nl | grep "     $P" | awk '{print $2}')"
+DOM="$Q"
+  echo "
+$DOM"
+   _mysqlchk
+ fi
+fi
 }
 ####  Adding and removing mysql user ######
 _mysqlchk(){
-C="$(siteworx -u --login_domain="$varDOM" -c MysqlUser \
--n -a list \| "$AWK" '{print $1}' | "$GREP" "Pz9QmXl")"
+C="$(siteworx -u --login_domain="$DOM" -c MysqlUser \
+-n -a list | awk '{print $1}' | grep "Pz9QmXl")"
 
   if [[ -n "$C" ]]; then
-    "$ECHO" "User exists"
+    echo -e "
+"$RED"User already exists"$NC"
+"
 else
    if [[ -z "$C" ]]; then
     trap "_mysqlrm" EXIT
@@ -54,51 +108,114 @@ fi
 }
 _mysqladd(){
 ##Add Pz9QmXl user to iworx
-"$ECHO" "adding mysql user"
-siteworx -u --login_domain="$varDOM" -c MysqlUser -n \
+printf "adding user..."
+siteworx -u --login_domain="$DOM" -c MysqlUser -n \
 -a add --name Pz9QmXl --password EZSRbdsEpHu5A8NR --confirm_password EZSRbdsEpHu5A8NR
 ##list all databases
-D="$(siteworx -u --login_domain="$varDOM" -c MysqlDb -a list | "$AWK" '{print $1}')"
+D="$(siteworx -u --login_domain="$DOM" -c MysqlDb -a list | awk '{print $1}')"
 ##add Pz9QmXl user to all databases
-for x in $D; do siteworx -u --login_domain="$varDOM" -c MysqlPerms \
+for x in $D; do siteworx -u --login_domain="$DOM" -c MysqlPerms \
 -n -a add --name $x --user Pz9QmXl --perms all; done
+printf "Done\n"
+echo ""
     _fileinfo
 }
 _mysqlrm(){
-siteworx -u --login_domain="$varDOM" -c MysqlUser -n -a delete --name Pz9QmXl
-   "$ECHO" "removed mysql user, all set!"
+siteworx -u --login_domain="$DOM" -c MysqlUser -n -a delete --name Pz9QmXl
+   echo "
+Removed mysql user, all set!"
 }
+######## START OF IMPORT #########
 
 _fileinfo(){
-varUSER="$(siteworx -u --login_domain="$varDOM" -n -c overview \
--a listAccountDetails | head -n1 | awk '{print $2}')"
+USER="$(siteworx -u --login_domain="$DOM" -n -c Overview -a listAccountDetails | head -n1 | awk '{print $2}')"
 
-  "$ECHO" -n "
-File: "
-  read varDBF
-if [[ "$varDBF" == "stop" || "$varDBF" == "quit" || "$varDBF" == "q" ]]; then
-    "$ECHO" "ending script"
+  echo -n "File: "
+  read DBF
+_inputchk
+}
+_inputchk(){
+if [[ -z $DBF ]]; then
+_fileinfo
+else
+if [[ "$DBF" == "stop" || "$DBF" == "quit" || "$DBF" == "q" || "$DBF" == "exit" ]]; then
+    echo "ending script.."
 else
     _fileinfo2
  fi
+fi
 }
+
 _fileinfo2(){
-I="$("$ECHO" "$varDBF" | "$SED" 's/.*\(...\)/\1/')"
+I="$(echo "$DBF" | sed 's/.*\(...\)/\1/')"
  if [[ "$I" == ".xz" || "$I" == ".gz" || "$I" == "sql" ]]; then
    _dbinfo
 else
-   "$ECHO" "not a supported file extension"
+   echo -e "
+"$RED"Not a supported file type"$NC"
+"
    _fileinfo
  fi
 }
-
+############################################################
 _dbinfo(){
-B="$("$ECHO" "$varDBF" | "$SED" 's/.*\(...\)/\1/')"
-     "$ECHO" -n "Database: "
-        read varDB
-if [[ "$varDB" == "stop" || "$varDB" == "q" || "$varDB" == "quit" ]]; then
-     "$ECHO" "ending script"
+B="$(echo "$DBF" | sed 's/.*\(...\)/\1/')"
+     echo -n "Database: "
+        read DB
+_inputchk2
+}
+_inputchk2(){
+if [[ -z $DB ]]; then
+_dbinfo
 else
+if [[ "$DB" == "stop" || "$DB" == "quit" || "$DB" == "q" || "$DB" == "exit" ]]; then
+    echo "ending script.."
+else
+ _filechk
+ fi
+fi
+}
+_filechk(){
+if [[ $DB == "gofile" ]]; then
+_fileinfo
+else
+_userinfo
+fi
+}
+_userinfo(){
+J="$(echo "$DB" | grep "$USER")"
+if [[ -n "$J" ]]; then
+DB="$(echo "$DB")"
+_DBexchk
+else
+DB="$(echo ""$USER"_"$DB"")"
+_DBexchk
+fi
+}
+
+_DBexchk(){
+DBC="$(sudo siteworx -u --login_domain=akhalaf.com -n -c MysqlDb -a listMysqlDatabases | awk '{print $2}' | grep $DB$)"
+if [[ -z "$DBC" ]]; then
+echo -e "
+"$RED"No Db Found"$NC"
+"
+_dbinfo
+else
+_chksize
+fi
+}
+_chksize(){
+O="$(sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a listMysqlDatabases | awk '{print $4, $2}' | grep $DB$ | awk '{print $1}')"
+if [[ "$O" != "0.00" ]]; then
+echo -e "
+"$RED"DB not empty!"$NC"
+"
+   _dbinfo
+else
+   _pexten
+fi
+}
+_pexten(){
    if [[ "$B" == "sql" ]]; then
      _cat
 else
@@ -110,57 +227,29 @@ else
    fi
   fi
  fi
-fi
 }
 _cat(){
-    "$ECHO" "Importing Database"
-"$CAT" "$varDBF" | "$SED" -r 's/DEFINER\s*\=\s*\S+\@\S+//g' \
-| mysql -u "$varUSER"_Pz9QmXl -p "$varDB" --password=EZSRbdsEpHu5A8NR
-    "$ECHO" "done
-"
+   printf  "Importing Database..."
+cat "$DBF" | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$USER"_Pz9QmXl -p "$DB" --password=EZSRbdsEpHu5A8NR
+    printf "Done\n"
+    echo ""
     _fileinfo
 }
 _zcat(){
-    "$ECHO" "Importing Database"
-"$ZCAT" "$varDBF" | "$SED" -r 's/DEFINER\s*\=\s*\S+\@\S+//g' \
-| mysql -u "$varUSER"_Pz9QmXl -p "$varDB" --password=EZSRbdsEpHu5A8NR
-    "$ECHO" "done
-"
+    printf "Importing Database..."
+zcat "$DBF" | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$USER"_Pz9QmXl -p "$DB" --password=EZSRbdsEpHu5A8NR
+    printf "Done\n"
+    echo ""
     _fileinfo
 }
 _xzcat(){
-   "$ECHO" "Importing Database"
-"$XZCAT" "$varDBF" | "$SED" -r 's/DEFINER\s*\=\s*\S+\@\S+//g' \
-| mysql -u "$varUSER"_Pz9QmXl -p "$varDB" --password=EZSRbdsEpHu5A8NR
-   "$ECHO" "done
-"
+   printf "Importing Database..."
+xzcat "$DBF" | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$USER"_Pz9QmXl -p "$DB" --password=EZSRbdsEpHu5A8NR
+   printf "Done\n"
+   echo ""
    _fileinfo
 }
 ###################################
-_helpsec(){
-DASH="$(for i in {1..69}; do "$ECHO" -n "-"; done)";
-
-    "$CAT" <<- EOF
-
-Help section:
-$DASH
-This script is used to import databases one after another for one user.
-Usage: dbimport
-
-Enter Master domain or any secondary domain..
-Enter filename or full path to filename plus file.
-Enter database name to import into.
-
-This script accepts xz, gz and sql extensions.
-
-If the file does not end in any of the above extensions, rename so ending has sql.
-
-There are multiple ways to exit the script.
-ctrl c at anytime, q, quit or stop when asked for file or database.
-$DASH
-
-EOF
-}
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then
    _helpsec
  else
