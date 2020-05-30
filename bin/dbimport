@@ -11,23 +11,22 @@ _helpsec(){
 
     cat <<- EOF
 
-Help section:
 $DASH
-This script is used to import databases one after another for one user.
+Used to import databases one after another for one user.
 
      Usage: dbimport
 
-Enter domain or portion of domain and choose.
+Enter domain or portion of domain and choose number.
 Enter filename.
 Enter database.
 
-accepts xz, gz and sql extensions..
+accepts xz, gz and sql file extensions.
 
 If the file does not end in any of the above extensions, rename so it has appropriate ending.
 
 There are multiple ways to exit the script.
 ctrl c at anytime, q, quit, exit or stop when asked for file or database.
-can type "gofile" when asked for the database to re-enter filename and start over.
+Can type "gofile" when asked for the database to re-enter filename and start over.
 $DASH
 
 EOF
@@ -39,6 +38,8 @@ U="$(pwd | cut -d/ -f4)"
 G="$(ls /etc/httpd/conf.d/ | grep "vhost_"$U".conf")"
   if [[ -n "$G" ]]; then
     DOM="$U"
+    echo "
+$DOM"
     _mysqlchk
 else
      _domchk2
@@ -63,6 +64,8 @@ S="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | se
 R="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | tail -n1)"
   if [[ "$S" == "1" ]]; then
 DOM="$R"
+echo "
+$DOM"
 _mysqlchk
 else
 _domlist
@@ -71,22 +74,27 @@ fi
 _domlist(){
 CC="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | nl)"
 if [[ -z "$CC" ]]; then
-  echo -e ""$RED"Domain not found"$NC""
+  echo -e ""$RED"Not found"$NC""
 else
-  echo -e ""$RED"Domain ambiguous: Choose Domain"$NC"
+  echo -e ""$RED"Choose Domain [pick a number]: "$NC"
 "
 ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | nl
 
- echo -n "Domain: "
+ echo -n "
+Domain: "
  read P
 if [[ -z "$P" ]]; then
   _vhostchk
 else
 Q="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | nl | grep "     $P" | awk '{print $2}')"
+if [[ -z "$Q" ]]; then
+_vhostchk
+else
 DOM="$Q"
   echo "
 $DOM"
    _mysqlchk
+  fi
  fi
 fi
 }
@@ -114,8 +122,7 @@ siteworx -u --login_domain="$DOM" -c MysqlUser -n \
 ##list all databases
 D="$(siteworx -u --login_domain="$DOM" -c MysqlDb -a list | awk '{print $1}')"
 ##add Pz9QmXl user to all databases
-for x in $D; do siteworx -u --login_domain="$DOM" -c MysqlPerms \
--n -a add --name $x --user Pz9QmXl --perms all; done
+for x in $D; do siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name $x --user Pz9QmXl --perms all; done
 printf "Done\n"
 echo ""
     _fileinfo
@@ -147,7 +154,7 @@ fi
 }
 
 _fileinfo2(){
-I="$(echo "$DBF" | sed 's/.*\(...\)/\1/')"
+I="$(echo "$DBF" | tail -c 4)"
  if [[ "$I" == ".xz" || "$I" == ".gz" || "$I" == "sql" ]]; then
    _dbinfo
 else
@@ -159,7 +166,7 @@ else
 }
 ############################################################
 _dbinfo(){
-B="$(echo "$DBF" | sed 's/.*\(...\)/\1/')"
+B="$(echo "$DBF" | tail -c 4)"
      echo -n "Database: "
         read DB
 _inputchk2
@@ -194,7 +201,7 @@ fi
 }
 
 _DBexchk(){
-DBC="$(sudo siteworx -u --login_domain=akhalaf.com -n -c MysqlDb -a listMysqlDatabases | awk '{print $2}' | grep $DB$)"
+DBC="$(sudo siteworx -u --login_domain=$DOM -n -c MysqlDb -a listMysqlDatabases | awk '{print $2}' | grep $DB$)"
 if [[ -z "$DBC" ]]; then
 echo -e "
 "$RED"No Db Found"$NC"
