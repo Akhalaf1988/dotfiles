@@ -99,36 +99,38 @@ $DOM"
 fi
 }
 ####  Adding and removing mysql user ######
+
 _mysqlchk(){
+User1='Pz9QmXl'
 C="$(siteworx -u --login_domain="$DOM" -c MysqlUser \
--n -a list | awk '{print $1}' | grep "Pz9QmXl")"
+-n -a list | awk '{print $1}' | grep "$User1")"
 
   if [[ -n "$C" ]]; then
-    echo -e "
-"$RED"User already exists"$NC"
-"
+User1='pZ9qMxL'
+  trap "_mysqlrm" EXIT
+     _mysqladd
 else
    if [[ -z "$C" ]]; then
-    trap "_mysqlrm" EXIT
-    _mysqladd
+     trap "_mysqlrm" EXIT
+      _mysqladd
  fi
 fi
 }
 _mysqladd(){
-##Add Pz9QmXl user to iworx
+##Add $User1 user to iworx
 printf "adding user..."
 siteworx -u --login_domain="$DOM" -c MysqlUser -n \
--a add --name Pz9QmXl --password EZSRbdsEpHu5A8NR --confirm_password EZSRbdsEpHu5A8NR
+-a add --name "$User1" --password EZSRbdsEpHu5A8NR --confirm_password EZSRbdsEpHu5A8NR
 ##list all databases
 D="$(siteworx -u --login_domain="$DOM" -c MysqlDb -a list | awk '{print $1}')"
-##add Pz9QmXl user to all databases
-for x in $D; do siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name $x --user Pz9QmXl --perms all; done
+##add $User1 user to all databases
+for x in $D; do siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name $x --user "$User1" --perms all; done
 printf "Done\n"
 echo ""
     _fileinfo
 }
 _mysqlrm(){
-siteworx -u --login_domain="$DOM" -c MysqlUser -n -a delete --name Pz9QmXl
+siteworx -u --login_domain="$DOM" -c MysqlUser -n -a delete --name "$User1"
    echo "
 Removed mysql user, all set!"
 }
@@ -237,21 +239,21 @@ else
 }
 _cat(){
    printf  "Importing Database..."
-cat "$DBF" | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$USER"_Pz9QmXl -p "$DB" --password=EZSRbdsEpHu5A8NR
+cat "$DBF" | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$USER"_"$User1" -p "$DB" --password=EZSRbdsEpHu5A8NR
     printf "Done\n"
     echo ""
     _fileinfo
 }
 _zcat(){
     printf "Importing Database..."
-zcat "$DBF" | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$USER"_Pz9QmXl -p "$DB" --password=EZSRbdsEpHu5A8NR
+zcat "$DBF" | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$USER"_"$User1" -p "$DB" --password=EZSRbdsEpHu5A8NR
     printf "Done\n"
     echo ""
     _fileinfo
 }
 _xzcat(){
    printf "Importing Database..."
-xzcat "$DBF" | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$USER"_Pz9QmXl -p "$DB" --password=EZSRbdsEpHu5A8NR
+xzcat "$DBF" | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$USER"_"$User1" -p "$DB" --password=EZSRbdsEpHu5A8NR
    printf "Done\n"
    echo ""
    _fileinfo
