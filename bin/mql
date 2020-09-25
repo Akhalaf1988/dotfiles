@@ -5,26 +5,27 @@ DASH="$(for i in {1..12}; do echo -n "-"; done)"
 RED='\033[0;31m'
 NC='\033[0m'
 BLUE='\033[1;34m'
-####################
+###################
 _helpsec(){
 
 cat <<- EOF
+
 
 Usage: mql -flag
 
    Supported Aruguments
 
-      -uad|--uadbs          Add a new user to all dbs
-       -ad|--db             Add a new db
-       -au|--user           Add new user
-       -ed|--uxd            Add new user to existing db
-      -eud|--xuxd           Add an existing user to an existing db
-       -eu|--xund           Add an existing user to new db
-        -h|--help           Displays this message
-       -ld|--listdbs        lists all dbs
-       -lu|--listusers      lists all users
-      -nud|--nund           Creates a new db plus new user
-
+      -uad       Add a user to all dbs
+       -ad       Add a new db
+       -au       Add new user
+       -ed       Add new user to existing db
+      -eud       Add an existing user to an existing db
+       -eu       Add an existing user to new db
+        -c       Copy source db and import to new
+        -h       Displays this message
+       -ld       lists all dbs
+       -lu       lists all users
+      -nud       Creates a new db plus new user
 EOF
 }
 #########Domain check ########
@@ -77,7 +78,7 @@ fi
 }
 _dbinfoLchk(){
 W="$(echo "$DB" | wc -m)"
-if [[ "$W" -gt 8 ]]; then
+if [[ "$W" > 8 ]]; then
 echo -e ""$RED"Character length of 7exceeded"$NC""
 _dbinfo
 else
@@ -131,9 +132,9 @@ fi
 }
 _dbuinfoLchk(){
 W1="$(echo "$U" | wc -m)"
-if [[ "$W1" -gt 8 ]]; then
-echo -e ""$RED"Character limit of 7 exceeded"$NC""
-_dbuinfo
+if [[ "$W1" > 8 ]]; then
+   echo -e ""$RED"Character limit of 7 exceeded"$NC""
+   _dbuinfo
 fi
 }
 
@@ -196,6 +197,7 @@ fi
 }
 
 _dbuinfochk(){
+R="$(sudo siteworx -u --login_domain="$DOM" -n -c Overview -a listAccountDetails | head -n1 | awk '{print $2}')"
 Y="$(echo "$U" | grep "$R")"
 if [[ -n "$Y" ]]; then
 U="$(echo "$U" | cut -d_ -f2,3)"
@@ -399,7 +401,108 @@ Username: "$R"_"$U"
 password: "$PW""
 
 }
-##################################
+########## Clone database ########################
+_SDBinfo(){
+R="$(sudo siteworx -u --login_domain="$DOM" -n -c Overview -a listAccountDetails \
+| head -n1 | awk '{print $2}')"
+echo -n "Source DB: "
+read SDB
+_SDBinfochk
+}
+_SDBinfochk(){
+if [[ -z $SDB ]]; then
+_SDBinfo
+else
+_stripuser
+fi
+}
+_stripuser(){
+KK="$(echo "$SDB" | grep "$R")"
+if [[ -n "$KK" ]]; then
+SDB="$(echo "$SDB" | cut -d_ -f2,3)"
+_SDBchk
+else
+SDB="$(echo "$SDB")"
+_SDBchk
+fi
+}
+
+_SDBchk(){
+M1="$(sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a listMysqlDatabases | awk '{print $2}' | grep $SDB$)"
+
+if [[ -z "$M1" ]]; then
+    echo -e ""$RED"No DB found"$NC""
+    _SDBinfo
+else
+    _DDBinfo
+fi
+}
+
+_DDBinfo(){
+echo -n "Destination DB: "
+read DDB
+_DDBinfochk
+}
+
+_DDBinfochk(){
+if [[ -z $DDB ]]; then
+_DDBinfo
+else
+_DDBchk
+fi
+}
+_DDBchk(){
+M2="$(sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a listMysqlDatabases | awk '{print $2}' | grep $DDB$)"
+
+if [[ -n "$M2" ]]; then
+    echo -e ""$RED"DB already exists"$NC""
+    _DDBinfo
+else
+    _DDBLchk
+fi
+}
+_DDBLchk(){
+WX="$(echo "$U" | wc -m)"
+if [[ "$WX" > 8 ]]; then
+   echo -e ""$RED"Character limit of 7 exceeded"$NC""
+   _DDBinfo
+else
+   _stripuser1
+fi
+}
+_stripuser1(){
+KK1="$(echo "$DDB" | grep "$R")"
+if [[ -n "$KK1" ]]; then
+DDB="$(echo "$DDB" | cut -d_ -f2,3)"
+_SDBdump
+else
+DDB="$(echo "$DDB")"
+_SDBdump
+fi
+}
+
+_SDBdump(){
+printf "Adding user and permissions..."
+sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a add --name PZqm6C --password SomeCoolPassword123 --confirm_password SomeCoolPassword123
+sudo siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name "$SDB" --user PZqm6C --perms all
+printf "Done\n"
+printf "Exporting source database..."
+sudo -u "$R" mysqldump --opt --skip-lock-tables --routines --max_allowed_packet=2G -u "$R"_PZqm6C -p "$R"_"$SDB" --password=SomeCoolPassword123 | gzip > ~/"$R"_"$SDB".sql.gz
+printf "Done\n"
+_adu
+}
+_adu(){
+printf "Adding database and permissions..."
+sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a add --name "$DDB"
+sudo siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name "$DDB" --user PZqm6C --perms all
+printf "Done\n"
+printf "Importing database..."
+zcat ~/"$R"_"$SDB".sql.gz | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$R"_PZqm6C -p "$R"_"$DDB" --password=SomeCoolPassword123
+printf "Done\n"
+sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a delete --name PZqm6C
+   echo "
+Removed mysql user, all set!"
+}
 
 ##########List all dbs############
 _dblist(){
@@ -409,8 +512,8 @@ sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a listMysqlDatabases | awk
 }
 ##########List all users##########
 _listusers(){
-echo "Users list"
-echo "$DASH"
+echo "Users list
+$DASH"
 sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a listMysqlUsers | awk '{print $2}'
 }
 
@@ -418,7 +521,7 @@ if [[ "$1" == "-ld" || "$1" == "--listdbs" ]]; then
 _domchk
 _dblist
 else
-if [[ "$1" == "-eud" || "$1" == "--xuxd" ]]; then
+if [[ "$1" == "-eud" ]]; then
  _domchk
  _userinfo1
 else
@@ -426,43 +529,43 @@ if [[ "$1" == "-lu" || "$1" == "--listusers" ]]; then
 _domchk
 _listusers
 else
-if [[ "$1" == "-ed" || "$1" == "--uxd" ]]; then
+if [[ "$1" == "-ed" ]]; then
  _domchk
  _dbuinfo
 _passinfo
 _adduser1
 else
-if [[ "$1" == "-ad" || "$1" == "--db" ]]; then
+if [[ "$1" == "-ad" ]]; then
 _domchk
 _dbinfo
 _adddb
 else
-if [[ "$1" == "-au" || "$1" == "--user" ]]; then
+if [[ "$1" == "-au" ]]; then
 _domchk
 _dbuinfo
 _passinfo
 _adduser
 else
-if [[ "$1" == "-nud" || "$1" == "--nund" ]]; then
+if [[ "$1" == "-nud" ]]; then
 _domchk
 _dbinfo
 _dbuinfo
 _passinfo
 _adddbpu
 else
-if [[ "$1" == "-eu" || "$1" == "--xund" ]]; then
+if [[ "$1" == "-eu" ]]; then
 _domchk
 _dbinfo
 _dbuinfoe
 else
 if [[ "$1" == "-c" || "$1" == "--copy" ]]; then
 _domchk
-_DBCinfo
+_SDBinfo
 else
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then
 _helpsec
 else
-if [[ "$1" == "-uad" || "$1" == "--uadbs" ]]; then
+if [[ "$1" == "-uad" ]]; then
 _domchk
 _dbuinfo
 _passinfo
