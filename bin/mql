@@ -56,6 +56,7 @@ _domlist(){
 CC="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DOM | nl)"
 if [[ -z "$CC" ]]; then
   echo -e ""$RED"No Domain found"$NC""
+  _domchk
 else
   echo -e ""$RED"Choose Domain [pick a number]: "$NC"
 "
