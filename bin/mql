@@ -404,12 +404,19 @@ fi
 _chksize(){
 O="$(sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a listMysqlDatabases | awk '{print $4, $2}' | grep $DB$ | awk '{print $1}')"
 if [[ "$O" != "0.00" ]]; then
-echo -e "
-"$RED"DB not empty!"$NC"
-"
-   _dbinfo1
+echo -en ""$RED"DB not empty, import anyway [y/n]: "$NC""
+read IMC
+   _importchk
 else
    _mysqlchk
+fi
+}
+
+_importchk(){
+if [[ "$IMC" == "y" || "$IMC" == "Y" ]]; then
+_mysqlchk
+else
+_dbinfo1
 fi
 }
 _mysqlchk(){
