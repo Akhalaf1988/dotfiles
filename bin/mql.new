@@ -277,7 +277,7 @@ _getpass ()
     W3="$(shuf -n1000 "$D" | head -n1)";
     W4="$(shuf -n1000 "$D" | tail -n1)";
     N="$(seq 99 | sort -R | tail -n1)";
-    echo ""$W1""$W2""$W3""$W""$N"" | sed -e 's|["'\'']||g'
+    echo ""$W1""$W2""$W3""$W""$N"" | sed "s/'//g"
 }
 _passinfo ()
 {
