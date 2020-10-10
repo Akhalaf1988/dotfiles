@@ -138,7 +138,6 @@ _listusers
 ##### Copy ## option -c
 _COPY(){
 _dbinfo
-_SDBchk
 _adu
 }
 ##### Import ### option -i
