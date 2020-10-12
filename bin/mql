@@ -1,3 +1,4 @@
+
 #! /usr/bin/env bash
 
 ##global variables##
@@ -32,8 +33,8 @@ Usage: mql option
 EOF
 }
 ######### Domain and Vhost check #########
-_domchk ()
-{
+_domchk(){
+
     D="$(pwd | cut -d/ -f4)";
     V="$(ls /etc/httpd/conf.d/ | grep "vhost_"$D".conf")";
     if [[ -n "$V" ]]; then
@@ -44,8 +45,8 @@ _domchk ()
         _vhostchk;
     fi
 }
-_vhostchk ()
-{
+_vhostchk(){
+
     S="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DOM | wc -l)";
     Rx="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DOM | tail -n1)";
     if [[ "$S" == "1" ]]; then
@@ -55,8 +56,8 @@ _vhostchk ()
         _domlist;
     fi
 }
-_domlist ()
-{
+_domlist(){
+
     CC="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DOM | grep -v "000" | nl)";
     if [[ -z "$CC" ]]; then
         echo -e ""$RED"No Domain found"$NC"";
@@ -85,83 +86,108 @@ Domain #:"$NC" ";
 ############## Main ###############
 ## Adds user ## option -u
 _ADDUSER(){
-_uinfo
-_passinfo
-_adduser
+
+   _uinfo
+   _passinfo
+   _adduser
+
 }
 ### Adds user to all dbs ### option -U
 _ADDUSERALL(){
-_uinfo
-_passinfo
-_adduserall
+
+   _uinfo
+   _passinfo
+   _adduserall
+
 }
 ### Add new user to existing db ### option -ed
 _ADDNUXD(){
-_uinfo
-_passinfo
-_dbinfo
-_adduserndb
+
+   _uinfo
+   _passinfo
+   _dbinfo
+   _adduserndb
+
 }
 ### Add existing user to existing db ### option -eud
 _ADDXUXD(){
-_uinfo
-_dbinfo
-_addxuex
+
+   _uinfo
+   _dbinfo
+   _addxuex
+
 }
 ### Add existing user to new db ###
 _ADDXUND(){
-_uinfo
-_dbinfo
-_adddbxu
+
+   _uinfo
+   _dbinfo
+   _adddbxu
+
 }
 ### Add user and db ###
 _ADDNDNU(){
-_uinfo
-_passinfo
-_dbinfo
-_adddbpu
+
+   _uinfo
+   _passinfo
+   _dbinfo
+   _adddbpu
+
 }
 ### Add db ### option -d
 _ADDDB(){
-_dbinfo
-_adddb
+
+   _dbinfo
+   _adddb
+
 }
 ### option -ld
 _LISTDB(){
-_listdbs
+
+   _listdbs
+
 }
 ## option -lu
 _LISTUSER(){
-_listusers
+
+   _listusers
+
 }
 ##### Copy ## option -c
 _COPY(){
-_dbinfo
-_SDBdump
-_adu
+   echo -e ""$GREEN"Source db info"$NC""
+   _dbinfo
+   _SDBdump
+   _uinfo
+   _passinfo
+   _adu
+
 }
 ##### Import ### option -i
 _IMPORT(){
-_fileinfo
+
+   _fileinfo
+   _chksize
+
 }
 ########## Start DB info #########
-_dbinfo ()
-{
+_dbinfo(){
+
     R="$(sudo siteworx -u --login_domain="$DOM" -n -c Overview -a listAccountDetails | head -n1 | awk '{print $2}')";
     echo -en ""$CYAN"DB:"$NC" ";
     read DB;
     _inputchk
 }
-_inputchk ()
-{
+_inputchk(){
+
     if [[ -z $DB ]]; then
         _dbinfo;
     else
         _dbinfoUchk;
     fi
 }
-_dbinfoUchk ()
-{
+_dbinfoUchk(){
+
     J="$(echo "$DB" | grep "$R")";
     if [[ -n "$J" ]]; then
         DB="$(echo "$DB" | cut -d_ -f2,3)";
@@ -171,38 +197,28 @@ _dbinfoUchk ()
         _dbinfoEchk;
     fi
 }
-_dbinfoEchk ()
-{
+_dbinfoEchk(){
+
     WL="$(cat ~/myfile.txt)";
     E="$(sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a listMysqlDatabases | awk '{print $2}' | grep $DB$)";
-    if [[ -n "$E" && "$WL" == "-d" || -n "$E" && "$WL" == "-eu" || -n "$E" && "$WL" == "-ud" ]]; then
+    if [[ -n "$E" && "$WL" == "-d" || -n "$E" && "$WL" == "-eu" || -n "$E" && "$WL" == "-ud" || -n "$E" && "$WL" == "-cp" ]]; then
         echo -e ""$RED"DB already exists"$NC"";
         _dbinfo;
     else
         _dbchk;
     fi;
 }
-#_SDBchk ()
-#{
-#    M1="$(sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a listMysqlDatabases | awk '{print $2}' | grep $DB$)";
- #   if [[ -z "$M1" ]]; then
-  #      echo -e ""$RED"No DB found"$NC"";
-   #     _dbinfo;
-   # else
-    #    _SDBdump;
-   # fi
-#}
-_dbchk ()
-{
+_dbchk(){
+
     M="$(sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a listMysqlDatabases | awk '{print $2}' | grep $DB$)";
-    if [[ -z "$M" && "$WL" == "-ed" || -z "$M" && "$WL" == "-eud" || -z "$M" && "$WL" == "-c" ]]; then
+    if [[ -z "$M" && "$WL" == "-ed" || -z "$M" && "$WL" == "-eud" || -z "$M" && "$WL" == "-c" || -z "$M" && "$WL" == "-i" ]]; then
         echo -e ""$RED"No DB found"$NC"";
         _dbinfo;
     fi
 }
 ### Start User Info ###
-_uinfo ()
-{
+_uinfo(){
+
     WL="$(cat ~/myfile.txt)";
     R="$(sudo siteworx -u --login_domain="$DOM" -n -c Overview -a listAccountDetails | head -n1 | awk '{print $2}')";
     echo -en ""$CYAN"User:"$NC" ";
@@ -213,8 +229,8 @@ _uinfo ()
         _uinfoUchk;
     fi
 }
-_uinfoUchk ()
-{
+_uinfoUchk(){
+
     Y="$(echo "$U" | grep "$R")";
     if [[ -n "$Y" ]]; then
         U="$(echo "$U" | cut -d_ -f2,3)";
@@ -224,19 +240,19 @@ _uinfoUchk ()
         _uexistchk;
     fi
 }
-_uexistchk ()
-{
+_uexistchk(){
+
     WL="$(cat ~/myfile.txt)";
     UC="$(sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a listMysqlUsers | awk '{print $2}' | grep $U$)";
-    if [[ -n "$UC" && "$WL" == "-u" || -n "$UC" && "$WL" == "-U" || -n "$UC" && "$WL" == "-ed" || -n "$UC" && "$WL" == "-ud" ]]; then
+    if [[ -n "$UC" && "$WL" == "-u" || -n "$UC" && "$WL" == "-U" || -n "$UC" && "$WL" == "-ed" || -n "$UC" && "$WL" == "-ud" || -n "$UC" && "$WL" == "-cp" ]]; then
         echo -e ""$RED"User already exists"$NC"";
         _uinfo;
     else
         _uinfoLchk;
     fi
 }
-_uinfoLchk ()
-{
+_uinfoLchk(){
+
     W1="$(echo ""$U"" | wc -m)";
     if [[ "$W1" -gt "8" && "$WL" != "-eud" || "$W1" -gt "8" && "$WL" != "-eu" ]]; then
         echo -e ""$RED"Character limit of 7 exceeded"$NC"";
@@ -245,8 +261,8 @@ _uinfoLchk ()
         _userNFC;
     fi
 }
-_userNFC ()
-{
+_userNFC(){
+
     WL="$(cat ~/myfile.txt)";
     K="$(sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a listMysqlUsers | awk '{print $2}' | grep $U$)";
     if [[ -z "$K" && "$WL" == "-eud" || -z "$K" && "$WL" == "-eu" ]]; then
@@ -256,8 +272,8 @@ _userNFC ()
 }
 ####### End User info ########
 ####### Start pass info ######
-_pwg ()
-{
+_pwg(){
+
     if [[ -e /usr/local/interworx/lib/dict/words ]]; then
         D='/usr/local/interworx/lib/dict/words';
         _getpass;
@@ -266,8 +282,8 @@ _pwg ()
         _getpass;
     fi
 }
-_getpass ()
-{
+_getpass(){
+
     W1="$(shuf -n1000 "$D" | head -n1)";
     W2="$(shuf -n1000 "$D" | tail -n1)";
     W3="$(shuf -n1000 "$D" | head -n1)";
@@ -275,24 +291,24 @@ _getpass ()
     N="$(seq 99 | sort -R | tail -n1)";
     echo ""$W1""$W2""$W3""$W""$N"" | sed "s/'//g"
 }
-_passinfo ()
-{
+_passinfo(){
+
     echo -en ""$CYAN"New password (default: random):"$NC" ";
     read PW;
     _chkinput
 }
-_chkinput ()
-{
+_chkinput(){
+
     if [ -z "$PW" ]; then
         PW="$(_pwg)";
     else
         _chkpassL;
     fi
 }
-_chkpassL ()
-{
+_chkpassL(){
+
     LC="$(printf ""$PW"" | wc -m)";
-    if [[ "$LC" -gt "12" ]]; then
+    if [[ "$LC" -gt "11" ]]; then
         PW="$PW";
     else
         echo -e ""$RED"Password is too short""$NC";
@@ -302,26 +318,26 @@ _chkpassL ()
 
 ########## End Pass Info ##########
 ########## File Info ##############
-_fileinfo ()
-{
+_fileinfo(){
+
     USER="$(sudo siteworx -u --login_domain="$DOM" -n -c Overview -a listAccountDetails | head -n1 | awk '{print $2}')";
     echo -en ""$CYAN"File:"$NC" ";
     read DBF;
     _inputchkx
 }
-_inputchkx ()
-{
+_inputchkx(){
+
     if [[ -z $DBF ]]; then
         _fileinfo;
     else
         _fileinfo2;
     fi
 }
-_fileinfo2 ()
-{
+_fileinfo2(){
+
     I="$(echo "$DBF" | tail -c 4)";
     if [[ "$I" == ".xz" || "$I" == ".gz" || "$I" == "sql" ]]; then
-        _dbinfo1;
+        _dbinfo;
     else
         echo -e "
 "$RED"Not a supported file type"$NC"
@@ -329,63 +345,10 @@ _fileinfo2 ()
         _fileinfo;
     fi
 }
-######### DB info ########
-_dbinfo1 ()
-{
-    B="$(echo "$DBF" | tail -c 4)";
-    echo -en ""$CYAN"Database:"$NC" ";
-    read DB;
-    _inputchkx
-}
-_inputchkx ()
-{
-    if [[ -z $DB ]]; then
-        _dbinfo1;
-    else
-        _chkend2;
-    fi
-}
-_chkend2 ()
-{
-    if [[ "$DB" == "stop" || "$DB" == "quit" || "$DB" == "q" || "$DB" == "exit" ]]; then
-        echo "ending script..";
-    else
-        _filechk;
-    fi
-}
-_filechk ()
-{
-    if [[ $DB == "gofile" ]]; then
-        _fileinfo;
-    else
-        _userinfo;
-    fi
-}
-_userinfo ()
-{
-    J="$(echo "$DB" | grep "$USER")";
-    if [[ -n "$J" ]]; then
-        DB="$(echo "$DB"| cut -d_ -f2,3)";
-        _DBexchk;
-    else
-        DB="$(echo "$DB")";
-        _DBexchk;
-    fi
-}
-_DBexchk ()
-{
-    DBC="$(sudo siteworx -u --login_domain=$DOM -n -c MysqlDb -a listMysqlDatabases | awk '{print $2}' | grep $DB$)";
-    if [[ -z "$DBC" ]]; then
-        echo -e "
-"$RED"No Db Found"$NC"
-";
-        _dbinfo1;
-    else
-        _chksize;
-    fi
-}
-_chksize ()
-{
+
+############# Heads to dbinfo and back to chksize
+_chksize(){
+
     O="$(sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a listMysqlDatabases | awk '{print $4, $2}' | grep $DB$ | awk '{print $1}')";
     if [[ "$O" != "0.00" ]]; then
         echo -en ""$RED"DB not empty, import anyway [y/n]: "$NC"";
@@ -395,16 +358,18 @@ _chksize ()
         _mysqlchk;
     fi
 }
-_importchk ()
-{
+_importchk(){
+
     if [[ "$IMC" == "y" || "$IMC" == "Y" ]]; then
         _mysqlchk;
     else
-        _dbinfo1;
+        _dbinfo;
+        _chksize;
+
     fi
 }
-_mysqlchk ()
-{
+_mysqlchk(){
+
     User1='Pz9QmXl';
     C="$(sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a list | awk '{print $1}' | grep "$User1")";
     if [[ -n "$C" ]]; then
@@ -418,9 +383,9 @@ _mysqlchk ()
         fi;
     fi
 }
-_mysqladd ()
-{
-    printf ""$GREEN"Adding user and importing db..."$NC"";
+_mysqladd(){
+
+    printf ""$GREEN"Importing db..."$NC"";
     sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a add --name "$User1" --password EZSRbdsEpHu5A8NR --confirm_password EZSRbdsEpHu5A8NR;
     sudo siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name "$DB" --user "$User1" --perms all;
     _pexten
@@ -430,49 +395,49 @@ _mysqlrm(){
     sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a delete --name "$User1"
 
 }
-_pexten ()
-{
-    if [[ "$B" == "sql" ]]; then
+_pexten(){
+
+    if [[ "$I" == "sql" ]]; then
         _cat;
     else
-        if [[ "$B" == ".xz" ]]; then
+        if [[ "$I" == ".xz" ]]; then
             _xzcat;
         else
-            if [[ "$B" == ".gz" ]]; then
+            if [[ "$I" == ".gz" ]]; then
                 _zcat;
             fi;
         fi;
     fi
 }
-_cat()
-{
+_cat(){
+
     cat "$DBF" | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$USER"_"$User1" -p "$USER"_"$DB" --password=EZSRbdsEpHu5A8NR;
     printf ""$GREEN"Done\n"$NC"";
     _fileinfo
 }
-_zcat()
-{
+_zcat(){
+
     zcat "$DBF" | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$USER"_"$User1" -p "$USER"_"$DB" --password=EZSRbdsEpHu5A8NR;
     printf ""$GREEN"Done\n"$NC"";
     _fileinfo
 }
-_xzcat()
-{
+_xzcat(){
+
    xzcat "$DBF" | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$USER"_"$User1" -p "$USER"_"$DB" --password=EZSRbdsEpHu5A8NR;
    printf ""$GREEN"Done\n"$NC"";
    _fileinfo
 }
 ###### Export DB ######
-_exportchk ()
-{
+_exportchk(){
+
     if [[ -e /home/"$R" ]]; then
         _exportchk2;
     else
         echo -e ""$RED"No db found""$NC";
     fi
 }
-_exportchk2 ()
-{
+_exportchk2(){
+
     if [[ -e /home/mysql/ ]]; then
     NH="$(find /home/mysql/ -type d -iname "$R"_"$DB")";
         _exportchk3;
@@ -489,8 +454,8 @@ _exportchk3(){
        _export
     fi
 }
-_export ()
-{
+_export(){
+
     DATE="$(date +'%m-%d-%Y')";
     printf ""$GREEN"Exporting...""$NC";
     sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a add --name PZqm6C --password SomeCoolPassword123 --confirm_password SomeCoolPassword123;
@@ -502,8 +467,8 @@ _export ()
 
 ###################################
 ###########  ADD USER #############
-_adduser ()
-{
+_adduser(){
+
     printf ""$GREEN"Adding user...""$NC";
     R="$(sudo siteworx -u --login_domain="$DOM" -n -c Overview -a listAccountDetails | head -n1 | awk '{print $2}')";
     sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a add --name "$U" --password "$PW" --confirm_password "$PW";
@@ -515,8 +480,8 @@ _adduser ()
 }
 ########## END ADD USER #########
 ## ADD NEW USER TO EXISTING DB ##
-_adduserndb ()
-{
+_adduserndb(){
+
     printf ""$GREEN"Adding user...""$NC";
     sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a add --name "$U" --password "$PW" --confirm_password "$PW";
     sudo siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name "$DB" --user "$U" --perms all;
@@ -529,8 +494,8 @@ _adduserndb ()
 }
 #################################
 ########## ADD USER ALL #########
-_adduserall ()
-{
+_adduserall(){
+
     R="$(sudo siteworx -u --login_domain="$DOM" -n -c Overview -a listAccountDetails | head -n1 | awk '{print $2}')";
     D="$(sudo siteworx -u --login_domain="$DOM" -c MysqlDb -a list | awk '{print $1}')";
     printf ""$GREEN"Adding user..."$NC"";
@@ -547,8 +512,8 @@ _adduserall ()
 }
 #################################
 ########## ADD DB ###############
-_adddb ()
-{
+_adddb(){
+
     printf ""$GREEN"Adding DB..."$NC"";
     sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a add --name "$DB";
     printf ""$GREEN"Done\n""$NC";
@@ -559,16 +524,16 @@ _adddb ()
 ######### END ADD DB ###########
 ################################
 ###### ADD X USER TO X DB ######
-_addxuex ()
-{
+_addxuex(){
+
     printf ""$GREEN"Adding Permissions...""$NC";
     sudo siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name "$DB" --user "$U" --perms all;
     printf ""$GREEN"Done\n"$NC""
 }
 ################################
 ##### ADD X USER to N DB #######
-_adddbxu ()
-{
+_adddbxu(){
+
     printf ""$GREEN"Creating DB and adding user...""$NC";
     sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a add --name "$DB";
     sudo siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name "$DB" --user "$U" --perms all;
@@ -581,8 +546,8 @@ _adddbxu ()
 ################################
 ###### ADD N USER TO N DB ######
 ################################
-_addupdb ()
-{
+_addupdb(){
+
     printf ""$GREEN"Adding user and db...""$NC";
     sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a add --name "$U" --password "$PW" --confirm_password "$PW";
     sudo siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name "$DB" --user "$U" --perms all;
@@ -594,8 +559,8 @@ _addupdb ()
 }
 ######## ADD X U X DB ##########
 ##### ADD N DB PLUS N USER #####
-_adddbpu ()
-{
+_adddbpu(){
+
     printf ""$GREEN"Adding user and db...""$NC";
     sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a add --name "$DB" --create_user 1 --user "$U" --password "$PW" --confirm_password "$PW";
     printf ""$GREEN"Done\n""$NC";
@@ -606,34 +571,36 @@ _adddbpu ()
 "
 }
 ########## Dump Source DB ##############
-_SDBdump ()
-{
+_SDBdump(){
+
     printf ""$GREEN"Exporting db..."$NC"";
     sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a add --name PZqm6C --password SomeCoolPassword123 --confirm_password SomeCoolPassword123;
     sudo siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name "$DB" --user PZqm6C --perms all;
-    sudo -u "$R" mysqldump --opt --skip-lock-tables --routines --max_allowed_packet=2G -u "$R"_PZqm6C -p "$R"_"$DB" --password=SomeCoolPassword123 | gzip > ~/import_"$DB".sql.gz;
+    sudo -u "$R" mysqldump --opt --skip-lock-tables --routines --max_allowed_packet=2G -u "$R"_PZqm6C -p "$R"_"$DB" --password=SomeCoolPassword123 | gzip > ~/import_db.sql.gz;
     sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a delete --name PZqm6C;
     printf ""$GREEN"done\n"$NC"";
     _DDBinforchk
 }
-_DDBinforchk ()
-{
+_DDBinforchk(){
+
     echo -en ""$CYAN"Different User [y/n]:"$NC" ";
     read Y;
     if [[ "$Y" == "y" || "$Y" == "Y" ]]; then
         _Domchkmin;
     else
-        _DDBinfo;
+    echo -e ""$GREEN"Destination db info"$NC""
+       echo "-cp" > ~/myfile.txt
+       _dbinfo;
     fi
 }
-_Domchkmin ()
-{
+_Domchkmin(){
+
     echo -e ""$CYAN"Domain:"$NC" ";
     read DOM1;
     _domchk1
 }
-_domchk1 ()
-{
+_domchk1(){
+
     D2="$(ls /etc/httpd/conf.d/ | grep "vhost_"$DOM1".conf")";
     if [[ -z "$D2" ]]; then
         echo -e ""$RED"No domain found"$NC"";
@@ -642,126 +609,40 @@ _domchk1 ()
         D3="$(sudo siteworx -u --login_domain="$DOM1" -n -c Overview -a listAccountDetails | head -n1 | awk '{print $2}')";
         DOM="$DOM1";
         R="$D3";
-        _DDBinfo;
+        echo -e ""$GREEN"Destination db"$NC""
+        echo "-cp" > ~/myfile.txt
+        _dbinfo;
     fi
 }
-_DDBinfo ()
-{
-    echo -en ""$CYAN"Destination DB:"$NC" ";
-    read DDB;
-    _DDBinfochk
-}
-_DDBinfochk ()
-{
-    if [[ -z $DDB ]]; then
-        _DDBinfo;
-    else
-        _DDBchk;
-    fi
-}
-_DDBchk ()
-{
-    M2="$(sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a listMysqlDatabases | awk '{print $2}' | grep $DDB$)";
-    if [[ -n "$M2" ]]; then
-        echo -e ""$RED"DB already exists"$NC"";
-        _DDBinfo;
-    else
-        _stripuser1;
-    fi
-}
-_stripuser1 ()
-{
-    KK1="$(echo "$DDB" | grep "$R")";
-    if [[ -n "$KK1" ]]; then
-        DDB="$(echo "$DDB" | cut -d_ -f2,3)";
-        _DDBLchk;
-    else
-        DDB="$(echo "$DDB")";
-        _DDBLchk;
-    fi
-}
-_DDBLchk ()
-{
-    WX="$(echo "$DDB" | wc -m)";
-    if [[ "$WX" -gt 8 ]]; then
-        echo -e ""$RED"Character limit of 7 exceeded"$NC"";
-        _DDBinfo;
-    else
-        _DBU;
-    fi
-}
-_DBU ()
-{
-    echo -en ""$CYAN"User:"$NC" ";
-    read DBU;
-    _DBUchk
-}
-_DBUchk ()
-{
-    if [[ -z $DBU ]]; then
-        _DBU;
-    else
-        _DBUexist;
-    fi
-}
-_DBUexist ()
-{
-    UC1="$(sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a listMysqlUsers | awk '{print $2}' | grep $DBU$)";
-    if [[ -n "$UC1" ]]; then
-        echo -e ""$RED"User already exists"$NC"";
-        _DBU;
-    else
-        _stripuser2;
-    fi
-}
-_stripuser2 ()
-{
-    KK1="$(echo "$DBU" | grep "$R")";
-    if [[ -n "$KK1" ]]; then
-        DBU="$(echo "$DBU" | cut -d_ -f2,3)";
-        _DBULchk;
-    else
-        DBU="$(echo "$DBU")";
-        _DBULchk;
-    fi
-}
-_DBULchk ()
-{
-    WX1="$(echo "$DBU" | wc -m)";
-    if [[ "$WX1" -gt 8 ]]; then
-        echo -e ""$RED"Character limit of 7 exceeded"$NC"";
-        _DBU;
-    else
-        _passinfo;
-    fi
-}
-_adu ()
-{
+
+
+_adu(){
+
     printf ""$GREEN"Adding database and user..."$NC"";
-    sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a add --name "$DDB";
-    sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a add --name "$DBU" --password "$PW" --confirm_password "$PW";
-    sudo siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name "$DDB" --user "$DBU" --perms all;
+    sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a add --name "$DB";
+    sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a add --name "$U" --password "$PW" --confirm_password "$PW";
+    sudo siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name "$DB" --user "$U" --perms all;
     printf ""$GREEN"done\n"$NC"";
     printf ""$GREEN"Importing database..."$NC"";
-    zcat ~/import_"$DB".sql.gz | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$R"_"$DBU" -p "$R"_"$DDB" --password="$PW";
-    rm ~/import_"$DB".sql.gz;
+    zcat ~/import_db.sql.gz | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$R"_"$U" -p "$R"_"$DB" --password="$PW";
+    rm ~/import_db.sql.gz;
     printf ""$GREEN"done\n"$NC"";
     echo -e ""$GREEN"
- Database:"$NC" "$R"_"$DDB""$GREEN"
- DBUser:"$NC"   "$R"_"$DBU""$GREEN"
+ Database:"$NC" "$R"_"$DB""$GREEN"
+ DBUser:"$NC"   "$R"_"$U""$GREEN"
  Password:"$NC" "$PW"
 "
 }
-_filerm ()
-{
+_filerm(){
+
     if [[ -e ~/myfile.txt ]]; then
         rm ~/myfile.txt;
     fi
 }
 
 ######### LIST USERS ###########
-_listusers ()
-{
+_listusers(){
+
     echo -e ""$CYAN"
 ~Users list~
 "$DASH""$NC""; echo -e ""$GREEN""
@@ -769,13 +650,13 @@ _listusers ()
    echo -e ""$NC""
 }
 ######### LIST DBS ###########
-_listdbs ()
-{
+_listdbs(){
+
     echo -e "
 "$CYAN"~Db list~
 "$DASH""$NC"
 ";
-    sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a listMysqlDatabases | awk '{print "\033[0;32m"$2"\033[0m", "\033[0;36m"$4"\033[0m", "\033[0;36m"$5"\033[0m"}' | awk '{ printf("%-30s %8s %3s\n", $1, $2, $3);}'
+    sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a listMysqlDatabases | awk '{print "\033[0;32m"$2"\033[0m", "\033[0;36m"$4"\033[0m", "\033[0;36m"$5"\033[0m"}' | awk '{ printf("%-35s %8s %10s\n", $1, $2, $3);}'
    echo ""
 }
 
@@ -845,6 +726,8 @@ if [[ "$1" == "-x" && -n "$2" ]]; then
    _exportchk
  else
 if [[ "$1" == "-i" ]]; then
+  echo "-i" > ~/myfile.txt
+   trap "_filerm" EXIT
    _domchk
    _IMPORT
  else
