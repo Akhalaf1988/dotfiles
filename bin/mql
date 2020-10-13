@@ -419,7 +419,7 @@ _cat(){
 
       echo -e ""$GREEN"Importing DB"$CYAN"
 "
-      { echo "SET FOREIGN_KEY_CHECKS=0;" ; pv -Ws $(cat "$DBF" | wc -c) "$DBF"; } | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | sed -e 's/INSERT INTO/INSERT IGNORE INTO/g' | mysql -u "$USER"_"$User1" -p "$USER"_"$DB" --password=EZSRbdsEpHu5A8NR;
+      { echo "SET FOREIGN_KEY_CHECKS=0;" ; pv -cWs $(cat "$DBF" | wc -c) "$DBF"; } | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | sed -e 's/INSERT INTO/INSERT IGNORE INTO/g' | mysql -u "$USER"_"$User1" -p "$USER"_"$DB" --password=EZSRbdsEpHu5A8NR;
       echo -e ""$NC""
     _fileinfo
 }
@@ -624,7 +624,7 @@ _adu(){
     gunzip ~/import_db.sql.gz
     echo ""
     echo ""
-{ echo "SET FOREIGN_KEY_CHECKS=0;" ; pv -Ws $(cat ~/import_db.sql | wc -c) ~/import_db.sql; } | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | sed -e 's/INSERT INTO/INSERT IGNORE INTO/g' | mysql -u "$R"_"$U" -p "$R"_"$DB" --password="$PW";
+{ echo "SET FOREIGN_KEY_CHECKS=0;" ; pv -cWs $(cat ~/import_db.sql | wc -c) ~/import_db.sql; } | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | sed -e 's/INSERT INTO/INSERT IGNORE INTO/g' | mysql -u "$R"_"$U" -p "$R"_"$DB" --password="$PW";
     rm ~/import_db.sql;
     echo -e ""$GREEN"
  Database:"$NC" "$R"_"$DB""$GREEN"
