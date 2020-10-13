@@ -1,4 +1,3 @@
-
 #! /usr/bin/env bash
 
 ##global variables##
@@ -385,10 +384,11 @@ _mysqlchk(){
 }
 _mysqladd(){
 
-    printf ""$GREEN"Importing db..."$NC"";
+    printf ""$GREEN"Adding permissions..."$NC"";
     sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a add --name "$User1" --password EZSRbdsEpHu5A8NR --confirm_password EZSRbdsEpHu5A8NR;
     sudo siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name "$DB" --user "$User1" --perms all;
-    _pexten
+    printf ""$GREEN"Done\n"$NC"";
+   _pexten
 }
 _mysqlrm(){
 
@@ -401,32 +401,29 @@ _pexten(){
         _cat;
     else
         if [[ "$I" == ".xz" ]]; then
-            _xzcat;
+           unxz "$DBF" 2> /dev/null
+           DBF="$(echo ""$DBF"" | sed 's/\.xz//g')"
+           _cat;
         else
             if [[ "$I" == ".gz" ]]; then
-                _zcat;
+                gunzip "$DBF" 2> /dev/null
+                DBF="$(echo ""$DBF"" | sed 's/\.gz//g')"
+                _cat;
+            else
+               _cat;
             fi;
         fi;
     fi
 }
 _cat(){
 
-    cat "$DBF" | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$USER"_"$User1" -p "$USER"_"$DB" --password=EZSRbdsEpHu5A8NR;
-    printf ""$GREEN"Done\n"$NC"";
+      echo -e ""$GREEN"Importing DB"$CYAN"
+"
+      { echo "SET FOREIGN_KEY_CHECKS=0;" ; pv -Ws $(cat "$DBF" | wc -c) "$DBF"; } | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | sed -e 's/INSERT INTO/INSERT IGNORE INTO/g' | mysql -u "$USER"_"$User1" -p "$USER"_"$DB" --password=EZSRbdsEpHu5A8NR;
+      echo -e ""$NC""
     _fileinfo
 }
-_zcat(){
 
-    zcat "$DBF" | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$USER"_"$User1" -p "$USER"_"$DB" --password=EZSRbdsEpHu5A8NR;
-    printf ""$GREEN"Done\n"$NC"";
-    _fileinfo
-}
-_xzcat(){
-
-   xzcat "$DBF" | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$USER"_"$User1" -p "$USER"_"$DB" --password=EZSRbdsEpHu5A8NR;
-   printf ""$GREEN"Done\n"$NC"";
-   _fileinfo
-}
 ###### Export DB ######
 _exportchk(){
 
@@ -623,10 +620,12 @@ _adu(){
     sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a add --name "$U" --password "$PW" --confirm_password "$PW";
     sudo siteworx -u --login_domain="$DOM" -c MysqlPerms -n -a add --name "$DB" --user "$U" --perms all;
     printf ""$GREEN"done\n"$NC"";
-    printf ""$GREEN"Importing database..."$NC"";
-    zcat ~/import_db.sql.gz | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | mysql -u "$R"_"$U" -p "$R"_"$DB" --password="$PW";
-    rm ~/import_db.sql.gz;
-    printf ""$GREEN"done\n"$NC"";
+    printf ""$GREEN"Importing database"$CYAN"";
+    gunzip ~/import_db.sql.gz
+    echo ""
+    echo ""
+{ echo "SET FOREIGN_KEY_CHECKS=0;" ; pv -Ws $(cat ~/import_db.sql | wc -c) ~/import_db.sql; } | sed -r 's/DEFINER\s*\=\s*\S+\@\S+//g' | sed -e 's/INSERT INTO/INSERT IGNORE INTO/g' | mysql -u "$R"_"$U" -p "$R"_"$DB" --password="$PW";
+    rm ~/import_db.sql;
     echo -e ""$GREEN"
  Database:"$NC" "$R"_"$DB""$GREEN"
  DBUser:"$NC"   "$R"_"$U""$GREEN"
