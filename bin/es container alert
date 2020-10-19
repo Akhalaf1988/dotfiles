@@ -1,0 +1,51 @@
+#! /usr/bin/env bash
+
+_test(){
+
+    TF='/home/ac200519/bin/HJRG-2690-tempfile'
+    if [[ -e "$TF" ]]; then
+       echo "file exists"
+     else
+       _curltest
+   fi
+}
+_remfile(){
+     if [[ -e /home/ac200519/bin/HJRG-2690-tempfile ]]; then
+           rm /home/ac200519/bin/HJRG-2690-tempfile
+        else
+           echo "no file to remove"
+     fi
+}
+_curltest(){
+     echo "tmp file to prevent duplicate processes" > /home/ac200519/bin/HJRG-2690-tempfile
+     trap "_remfile" EXIT
+     curl -ILs --connect-timeout 10 cg-2362-elasticsearch.uk-south-2.nxcli.net:40968 -o "/home/ac200519/bin/containcall-HJRG-2690.txt"
+_req="$?"
+     if [[ "$_req" != "0" ]]; then
+        _emailclient
+      else
+        _chkstatus
+     fi
+}
+
+
+_chkstatus(){
+    curl -ILs --connect-timeout 10 cg-2362-elasticsearch.uk-south-2.nxcli.net:40968 -o "/home/ac200519/bin/containcall-HJRG-2690.txt"
+C="$(head -n1 /home/ac200519/bin/containcall-HJRG-2690.txt | awk '{print $2}')"
+    if [[ "$C" != "200" ]]; then
+       _emailclient
+     else
+       echo "all good"
+    fi
+}
+
+_emailclient(){
+
+        echo "This is a notice that your Elastic search container may be experiencing issues. Please email support@nexcess.net or open a support ticket from your portal account at portal.nexcess.net for further information.
+
+-Regards
+Nexcess Support" | mail -s "ES-Container Alert!" abbaskay88@yahoo.com;
+     sleep 3600s
+}
+
+_test
