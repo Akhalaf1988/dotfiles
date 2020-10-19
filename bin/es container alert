@@ -1,7 +1,6 @@
 #! /usr/bin/env bash
 
 U="$(pwd -P | cut -d/ -f4)"
-clientemail='example@example.com'
 _Host='cg-2362-elasticsearch.ex-ample-2.nxcli.net'
 _Port='40098'
 _test(){
@@ -48,7 +47,7 @@ _emailclient(){
         echo "This is a notice that your Elastic search container may be experiencing issues. Please email support@nexcess.net or open a support ticket from your portal account at portal.nexcess.net for further information.
 
 -Regards
-Nexcess Support" | mail -s "ES-Container Alert!" "$clientemail";
+Nexcess Support" | mail -s "ES-Container Alert!" example@example.com;
      sleep 3600s
 }
 
