@@ -1,9 +1,9 @@
 #! /usr/bin/env bash
 
 U="$(pwd -P | cut -d/ -f4)"
-clientemail='jon@jaydeeliving.co.uk'
-_Host='cg-2362-elasticsearch.uk-south-2.nxcli.net'
-_Port='40968'
+clientemail='example@example.com'
+_Host='cg-2362-elasticsearch.ex-ample-2.nxcli.net'
+_Port='40098'
 _test(){
 
     TF='/home/"$U"/bin/HJRG-2690-tempfile'
