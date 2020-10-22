@@ -5,11 +5,11 @@
         for i in $(ls -1 /opt/nexcess/php*/root/var/log/php-fpm/error.log /var/log/php-fpm/error.log /var/log/httpd/error_log);
         do
             grep -iEh "max(clients|_children)" $i;
-        done | grep -v "www";
+        done;
     else
         for i in $(ls -1 /var/log/php-fpm/error.log /opt/remi/php*/root/var/log/php-fpm/error.log /var/opt/remi/php*/log/php-fpm/error.log);
         do
             grep -iEh "max(clients|_children)" $i;
-        done | grep -v "www"
+        done;
         grep scoreboard /var/log/httpd/error_log | tail -n1;
     fi
