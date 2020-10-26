@@ -630,7 +630,7 @@ _DDBinforchk(){
 }
 _Domchkmin(){
 
-    echo -e ""$CYAN"Domain:"$NC" ";
+    echo -en ""$CYAN"Domain:"$NC" ";
     read DOM1;
     _domchk1
 }
