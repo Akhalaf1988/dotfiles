@@ -1,4 +1,6 @@
-#! /usr/bin/env bash
+maxes(){
+
+
 _helpsec(){
 cat <<- EOF
 
@@ -54,3 +56,4 @@ if [[ "$1" == "-d" || "$1" == "--deep" ]]; then
             _max;
         fi;
     fi
+}
