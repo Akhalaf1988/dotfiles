@@ -20,12 +20,12 @@ _max(){
 for x in $(ls -1 /opt/nexcess/php*/root/var/log/php-fpm/error.log /opt/nexcess/php*/root/var/log/php-fpm/error.log-* /var/log/php-fpm/error.log /var/log/php-fpm/error.log-* /var/log/httpd/error_log /var/log/httpd/error_log-*);
         do
             grep -iEh "max(clients|_children)" $x;
-        done | grep -v "www" | grep "$USER" | sed 's/-/ /g' | sort -k3rn -k2M
+        done 2> /dev/null | grep -v "www" | grep "$USER" | sed 's/-/ /g' | sort -k3rn -k2M
     else
 for x in $(ls -1 /var/opt/remi/php*/log/php-fpm/error.log /var/opt/remi/php*/log/php-fpm/error.log-*);
         do
             grep -ih "max_children" $x;
-        done | grep -v "www" | grep "$USER" | sed 's/-/ /g' | sort -k3rn -k2M
+        done 2> /dev/null | grep -v "www" | grep "$USER" | sed 's/-/ /g' | sort -k3rn -k2M
     fi
 }
 
@@ -36,12 +36,12 @@ _maxdeep(){
         for x in $(ls -1 /opt/nexcess/php*/root/var/log/php-fpm/error.log*.xz /var/log/php-fpm/error.log*.xz /var/log/httpd/error_log*.xz);
         do
             xzgrep -iEh "max(clients|_children)" $x;
-        done | grep -v "www" | grep "$USER"
+        done 2> /dev/null | grep -v "www" | grep "$USER"
     else
         for x in $(ls -1 /var/opt/remi/php*/log/php-fpm/error.log*.xz);
         do
             xzgrep -ih "max_children" $x;
-        done | grep -v "www" | grep "$USER"
+        done 2> /dev/null | grep -v "www" | grep "$USER"
     fi
 
 }
