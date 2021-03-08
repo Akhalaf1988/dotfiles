@@ -1,6 +1,6 @@
 maxes ()
 {
-    function _helpsec ()
+    _helpsec ()
     {
         cat
     } <<-EOF
@@ -14,34 +14,34 @@ Usage: maxes USER
 
 EOF
 
-    function _max ()
+    _max ()
     {
         H="$(hostname | grep -o "cloud")"
         if [[ "$H" != "cloud" ]]; then
             for x in $(find /opt/nexcess/php*/root/var/log/php-fpm/ /var/log/php-fpm/ /var/log/httpd/ -type f -iname "error.log*" | grep -Ev 'xz|gz');
             do
-                grep -iEh "max(clients|_children)" "$x";
-            done 2> /dev/null | grep -v "www" | grep "$USER" | sed 's/-/ /g' | sort -k3rn -k2M;
+                grep --color=auto -iEh "max(clients|_children)" "$x";
+            done 2> /dev/null | grep -v "www" | grep --color=auto "$USER" | sed 's/-/ /g' | sort -k3rn -k2M;
         else
             for x in $(find /var/opt/remi/php*/log/php-fpm/ -type f -iname "error.log*"| grep -Ev 'gz|xz');
             do
-                grep -ih "max_children" "$x";
-            done 2> /dev/null | grep -v "www" | grep "$USER" | sed 's/-/ /g' | sort -k3rn -k2M;
+                grep --color=auto -ih "max_children" "$x";
+            done 2> /dev/null | grep -v "www" | grep --color=auto "$USER" | sed 's/-/ /g' | sort -k3rn -k2M;
         fi
     };
-    function _maxdeep ()
+    _maxdeep ()
     {
         H="$(hostname | grep -o "cloud")";
         if [[ "$H" != "cloud" ]]; then
             for x in $(find /opt/nexcess/php*/root/var/log/php-fpm/ /var/log/php-fpm/ /var/log/httpd/ -type f -iname "error.log*" | grep "xz");
             do
                 xzgrep -iEh "max(clients|_children)" "$x";
-            done 2> /dev/null | grep -v "www" | grep "$USER" | sed 's/-/ /g' | sort -k3rn -k2M;
+            done 2> /dev/null | grep -v "www" | grep --color=auto "$USER" | sed 's/-/ /g' | sort -k3rn -k2M;
         else
             for x in $(find /var/opt/remi/php*/log/php-fpm/ -type f -iname "error.log*"| grep "xz");
             do
                 xzgrep -ih "max_children" "$x";
-            done 2> /dev/null | grep -v "www" | grep "$USER" | sed 's/-/ /g' | sort -k3rn -k2M;
+            done 2> /dev/null | grep -v "www" | grep --color=auto "$USER" | sed 's/-/ /g' | sort -k3rn -k2M;
         fi
     };
     if [[ "$1" == "-d" || "$1" == "--deep" ]]; then
