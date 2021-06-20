@@ -22,7 +22,7 @@ fsn ()
     fi;
     serverlist="$(for x in "${servers[@]}"; do uuid2fqdn "$x"; done)";
     serverips="$(for dom in $(echo "${serverlist[@]}"); do nslookup "$dom"; done 2> /dev/null \
-    | grep -E 'No\ answer|Address\: ' | awk '{print $2}' | sed "s/Can't/No Ipaddress/g")";
+    | grep -E 'No\ answer|Address\: ' | awk '{print $2}' | sed "s/Can't/No-Ipaddress/g")";
     D="$(for i in {1..16}; do echo -n "-"; done)";
     printf "\nServer List\n"$D"\n";
     paste <(echo "$serverlist") <( echo "$serverips") | column -t;
