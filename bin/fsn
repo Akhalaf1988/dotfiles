@@ -5,8 +5,12 @@ fsn ()
         printf "No domain given. This command requires a domain as an argument.\n";
         return 1;
     else
-        if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]] || [[ "$1" == "help" ]] || [[ "$1" == "-help" ]]; then
-            printf "\n\tUsage: findsite [DOMAIN]\n\t[DOMAIN] must be the target domain you wish to locate.\n\n";
+        if [[ "$1" == "-h" ]] \
+        || [[ "$1" == "--help" ]] \
+        || [[ "$1" == "help" ]] \
+        || [[ "$1" == "-help" ]]; then
+            printf "\n\tUsage: findsite [DOMAIN]\
+            \n\t[DOMAIN] must be the target domain you wish to locate.\n\n";
             return 1;
         fi;
     fi;
@@ -17,15 +21,16 @@ fsn ()
         return 1;
     fi;
     serverlist="$(for x in "${servers[@]}"; do uuid2fqdn "$x"; done)";
-    serverips="$(for dom in $(echo "${serverlist[@]}"); do nslookup "$dom"; done 2> /dev/null | grep -E 'No\ answer|Address\: ' | awk '{print $2}' | sed "s/Can't/No Ipaddress/g")";
+    serverips="$(for dom in $(echo "${serverlist[@]}"); do nslookup "$dom"; done 2> /dev/null \
+    | grep -E 'No\ answer|Address\: ' | awk '{print $2}' | sed "s/Can't/No Ipaddress/g")";
     D="$(for i in {1..16}; do echo -n "-"; done)";
     printf "\nServer List\n"$D"\n";
     paste <(echo "$serverlist") <( echo "$serverips") | column -t;
-    AREC="$(dig +short "$domain")";
+    AREC="$(dig +short +time\=5 +tries\=1 "$domain")";
     Proxycheck="$(curl -sIL "$domain"/nexcess_proxy_test | grep -i x-hostname | awk '{print $2}')";
     if [[ -n "$AREC" ]]; then
         printf "\nA Record\n"$D"\n";
-        dig +short "$domain";
+        dig +short +time\=5 +tries\=1 "$domain";
     fi;
     if [[ -n "$Proxycheck" ]]; then
         printf "\nLive Server\n"$D"\n";
