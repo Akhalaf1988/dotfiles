@@ -1,4 +1,4 @@
-fsn ()
+fsn()
 {
     local domain;
     if [ -z "$1" ]; then
