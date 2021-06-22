@@ -34,7 +34,7 @@ fsn ()
     fi;
     if [[ -n "$Proxycheck" ]]; then
         printf "\nLive Server\n"$D"\n";
-        curl -sIL "$domain"/nexcess_proxy_test | grep --color=auto --color=auto -i x-hostname | awk '{print $2}';
+        curl -sIL "$domain"/nexcess_proxy_test | grep -i x-hostname | awk '{print $2}';
         printf "\n";
     fi
 }
