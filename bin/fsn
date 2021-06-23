@@ -33,7 +33,7 @@ fsn()
         dig +short +time\=5 +tries\=1 "$domain";
     fi;
     if [[ -n "$Proxycheck" ]]; then
-        printf "\nLive Server\n"$D"\n";
+        printf "\nLive Cloud Server\n"$D"\n";
         curl -sIL "$domain"/nexcess_proxy_test | grep -i x-hostname | awk '{print $2}';
         printf "\n";
     fi
