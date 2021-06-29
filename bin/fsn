@@ -30,11 +30,11 @@ fsn()
     Proxycheck="$(curl -sIL "$domain"/nexcess_proxy_test | grep -i x-hostname | awk '{print $2}')";
     if [[ -n "$AREC" ]]; then
         printf "\nA Record\n"$D"\n";
-        Arec;
+        echo ""$AREC"";
     fi;
     if [[ -n "$Proxycheck" ]]; then
         printf "\nLive Cloud Server\n"$D"\n";
-        Proxycheck;
+        echo ""$Proxycheck"";
         printf "\n";
     fi
 }
