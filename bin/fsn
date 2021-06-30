@@ -26,8 +26,8 @@ fsn()
     D="$(for i in {1..16}; do echo -n "-"; done)";
     printf "\nServer List\n"$D"\n";
     paste <(echo "$serverlist") <( echo "$serverips") | column -t;
-    AREC="$(dig +short +time\=5 +tries\=1 "$domain")";
-    Proxycheck="$(curl -sIL "$domain"/nexcess_proxy_test | grep -i x-hostname | awk '{print $2}')";
+    AREC="$(dig +short +time\=5 +tries\=1 "$domain" 2> /dev/null)";
+    Proxycheck="$(curl -sIL "$domain"/nexcess_proxy_test 2> /dev/null | grep -i x-hostname | awk '{print $2}')";
     if [[ -n "$AREC" ]]; then
         printf "\nA Record\n"$D"\n";
         echo ""$AREC"";
