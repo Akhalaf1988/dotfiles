@@ -1,0 +1,53 @@
+#! /usr/bin/env bash
+
+_main ()
+{
+    _hostname="$(echo "$(hostname)" | cut -d- -f1)";
+    _getusr="$(pwd | sed 's:^/chroot::' | cut -d/ -f3;)";
+    _getdomain="$(pwd | sed 's:^/chroot::' | cut -d/ -f4)";
+    GREEN='\033[0;32m';
+    B='\033[1;34m';
+    NC='\033[0m';
+
+    if [[ "${_hostname}" == "cloudhost" ]]; then
+        _conf="$(find /etc/redis-multi/ -type f -iname "${_getusr}.redis.conf")";
+    else
+        _conf="$(find /etc/redis-multi/ -type f -iname "${_getusr}"."${_getdomain}""*".conf -o -iname redis-multi_"${_getusr}"."${_getdomain}""*".conf)"
+
+    fi;
+
+    _port="$(grep ^port "${_conf}" 2> /dev/null |awk '{print $2}')";
+    _socket="$(grep unixsocket "${_conf}" 2> /dev/null | head -n1 | awk '{print $2}')";
+    _host="$(grep bind "${_conf}" 2> /dev/null | awk '{print $2}')";
+    _logfile="$(grep logfile "${_conf}" 2> /dev/null | awk '{print $2}')"
+    _pidfile="$(grep pidfile "${_conf}" 2> /dev/null | awk '{print $2}')"
+
+    if [[ ! -e "${_conf}" ]]; then
+        echo ""
+        echo -e ""$GREEN"No Redis info found"$NC""
+        echo ""
+     else
+       if [[ "${_host}" == "0.0.0.0" || "${_port}" == "0" ]]; then
+          echo "";
+          echo -e ""$B"Redis Info";
+          echo -e "--------------"$NC"";
+          echo -e ""$GREEN"Owner: "${_getusr}"";
+          echo -e "Socket: "${_socket}"";
+          sudo -u "${_getusr}" redis-cli -s "${_socket}" info | grep -E 'uptime|human|evict|^db' | grep -Ev 'system|lua|rss|seconds|scripts|mem_not' | sed 's/_human//g';
+          echo -e "Log file: "${_logfile}""
+          echo -e "Pid file: "${_pidfile}""
+          echo -e ""$NC"";
+       else
+          echo "";
+          echo -e ""$B"Redis Info";
+          echo -e "--------------"$NC"";
+          echo -e ""$GREEN"Owner: "${_getusr}"";
+          echo -e "Host: "${_host}":"${_port}"";
+          sudo -u "${_getusr}" redis-cli -h "${_host}" -p "${_port}" info | grep -E 'uptime|human|evict|^db' | grep -Ev 'system|lua|rss|seconds|scripts|mem_not' | sed 's/_human//g';
+          echo -e "Log file: "${_logfile}""
+          echo -e "Pid file: "${_pidfile}""
+          echo -e ""$NC"";
+     fi
+  fi
+}
+_main
