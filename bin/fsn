@@ -1,40 +1,49 @@
-fsn()
+fsn ()
 {
+    B='\033[1;34m';
+    R='\033[0;31m';
+    NC='\033[0m';
     local domain;
     if [ -z "$1" ]; then
-        printf "No domain given. This command requires a domain as an argument.\n";
+        printf "\n"$R"No domain given. This command requires a domain as an argument."$NC"\n\n";
         return 1;
     else
-        if [[ "$1" == "-h" ]] \
-        || [[ "$1" == "--help" ]] \
-        || [[ "$1" == "help" ]] \
-        || [[ "$1" == "-help" ]]; then
-            printf "\n\tUsage: findsite [DOMAIN]\
-            \n\t[DOMAIN] must be the target domain you wish to locate.\n\n";
+        if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]] || [[ "$1" == "help" ]] || [[ "$1" == "-help" ]]; then
+            printf "\n\t"$B"Usage: findsite [DOMAIN]            \n\t[DOMAIN] must be the target domain you wish to locate."$NC"\n\n";
             return 1;
         fi;
     fi;
     domain=$(normalizedomain "$1");
-    servers=($(grep -P "\"value\":.*\"${domain}\"" /home/domains.json | grep -oP '(?<=certname":")[^"]*'));
+    servers=($(grep -P "\"value\":.*\"${domain}\"" /home/domains.json     | grep -oP '(?<=certname":")[^"]*'));
     if [[ -z "${servers[*]}" ]]; then
-        printf "Site not found: %s\n" "$domain";
+        printf "\n";
+        echo -e ""$R"Site not found: "$domain""$NC"";
+        printf "\n";
         return 1;
     fi;
+    B='\033[1;34m';
+    R='\033[0;31m';
+    NC='\033[0m';
     serverlist="$(for x in "${servers[@]}"; do uuid2fqdn "$x"; done)";
-    serverips="$(for dom in $(echo "${serverlist[@]}"); do nslookup "$dom"; done 2> /dev/null \
-    | grep -E 'No\ answer|Address\: ' | awk '{print $2}' | sed "s/Can't/No-Ipaddress/g")";
+    cloudcheck="$(for x in "${servers[@]}"; do uuid2fqdn "$x"; done | grep 'cloud')";
+    serverips="$(for dom in $(echo "${serverlist[@]}"); do nslookup "$dom"; done 2> /dev/null     | grep -E 'No\ answer|Address\: '     | awk '{print $2}'     | sed "s/Can't/No-Ipaddress/g")";
     D="$(for i in {1..16}; do echo -n "-"; done)";
-    printf "\nServer List\n"$D"\n";
-    paste <(echo "$serverlist") <( echo "$serverips") | column -t;
-    AREC="$(dig +short +time\=5 +tries\=1 "$domain" 2> /dev/null)";
-    Proxycheck="$(curl -sIL "$domain"/nexcess_proxy_test 2> /dev/null | grep -i x-hostname | awk '{print $2}')";
-    if [[ -n "$AREC" ]]; then
-        printf "\nA Record\n"$D"\n";
-        echo ""$AREC"";
+    A="$(dig +short +time\=5 +tries\=2 "$domain" |grep -v [a-z,A-Z] 2> /dev/null)";
+    ORG="$(curl -s --connect-timeout 7 https://ipinfo.io/${A} | grep "org" | awk '{print $3, $4}' | sed -e 's/,//g' -e 's/"//g')";
+    Proxycheck="$(curl -sIL --connect-timeout 7 "$domain"/nexcess_proxy_test | grep -i x-hostname | awk '{print $2}')";
+    printf "\n"$B"Server List\n"$D"$R""\n";
+    paste <(echo "$serverlist") <( echo -e ""$R"$serverips"$NC"") | column -t;
+    if [[ -n "$A" ]]; then
+        printf "\n";
+        echo -e "${B}A record
+${D}${NC}
+${R}${A} ${ORG}${NC}";
+        printf "\n";
     fi;
-    if [[ -n "$Proxycheck" ]]; then
-        printf "\nLive Cloud Server\n"$D"\n";
-        echo ""$Proxycheck"";
+    if [[ -n "$cloudcheck" && -n "$Proxycheck" ]]; then
+        echo -e ""$B"Live Cloud Server
+"$D""$NC"
+"$R""$Proxycheck""$NC"";
         printf "\n";
     fi
 }
