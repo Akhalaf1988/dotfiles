@@ -29,7 +29,7 @@ fsn ()
     serverips="$(for dom in $(echo "${serverlist[@]}"); do nslookup "$dom"; done 2> /dev/null     | grep -E 'No\ answer|Address\: '     | awk '{print $2}'     | sed "s/Can't/No-Ipaddress/g")";
     D="$(for i in {1..16}; do echo -n "-"; done)";
     A="$(dig +short +time\=5 +tries\=2 "$domain" |grep -v [a-z,A-Z] 2> /dev/null)";
-    ORG="$(curl -s --connect-timeout 7 https://ipinfo.io/${A} | grep "org" | awk '{print $3, $4}' | sed -e 's/,//g' -e 's/"//g')";
+    ORG="$(for l in $(echo "${A}"); do curl -s --connect-timeout 7 https://ipinfo.io/${l}/org\? | awk '{print $2, $3}'; done)";
     Proxycheck="$(curl -sIL --connect-timeout 7 "$domain"/nexcess_proxy_test | grep -i x-hostname | awk '{print $2}')";
     printf "\n"$B"Server List\n"$D"$R""\n";
     paste <(echo "$serverlist") <( echo -e ""$R"$serverips"$NC"") | column -t;
