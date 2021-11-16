@@ -31,7 +31,7 @@ sup_getredis ()
                 echo -e "--------------";
                 echo -e "${_G}Owner: ${_getusr}";
                 echo -e "Socket: ${_socket}";
-                sudo -u "${_getusr}" redis-cli -s "${_socket}" info | grep --color=auto --color=auto --color=auto -E 'uptime|human|evict|^db' | grep --color=auto --color=auto --color=auto -Ev 'system|lua|rss|seconds|scripts|mem_not' | sed 's/_human//g';
+                sudo -u "${_getusr}" redis-cli -s "${_socket}" info | grep --color=auto -E 'uptime|human|evict|^db' | grep --color=auto -Ev 'system|lua|rss|seconds|scripts|mem_not' | sed 's/_human//g';
                 echo -e "Log file: ${_logfile}";
                 echo -e "Pid file: ${_pidfile}";
                 echo -e "$_NC";
@@ -41,7 +41,7 @@ sup_getredis ()
                 echo -e "--------------${_NC}";
                 echo -e "${_G}Owner: ${_getusr}";
                 echo -e "Host: ${_host}:${_port}";
-                sudo -u "${_getusr}" redis-cli -h "${_host}" -p "${_port}" info | grep --color=auto --color=auto --color=auto -E 'uptime|human|evict|^db' | grep --color=auto --color=auto --color=auto -Ev 'system|lua|rss|seconds|scripts|mem_not' | sed 's/_human//g';
+                sudo -u "${_getusr}" redis-cli -h "${_host}" -p "${_port}" info | grep --color=auto -E 'uptime|human|evict|^db' | grep --color=auto -Ev 'system|lua|rss|seconds|scripts|mem_not' | sed 's/_human//g';
                 echo -e "Log file: ${_logfile}";
                 echo -e "Pid file: ${_pidfile}";
                 echo -e "${_NC}";
