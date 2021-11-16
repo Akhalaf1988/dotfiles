@@ -1,45 +1,51 @@
-sup_grsn ()
+sup_getredis ()
 {
-    _hostname="$(echo "$(hostname)" | cut -d- -f1)";
-    _getusr="$(pwd | sed 's:^/chroot::' | cut -d/ -f3;)";
-    _getdomain="$(pwd | sed 's:^/chroot::' | cut -d/ -f4)";
+    local _hostname _getusr _G _B _NC _nkredis _conf _port _host _logfile _pidfile _socket;
+    _hostname="$( hostname | cut -d- -f1)";
+    _getusr="$(sup_getusr)";
     _G='\033[0;32m';
     _B='\033[1;34m';
     _NC='\033[0m';
     _nkredis="$(nkredis info | grep -A13 "Owner                : ${_getusr}")";
-    if [[ "${_hostname}" != "cloudhost" ]]; then
+    if [[ "${_hostname}" != "cloudhost" && -z ${_nkredis} ]]; then
         echo "";
-        echo -e "${_B}Redis Info";
-        echo -e "--------------";
-        echo -e "${_G}${_nkredis}";
-        echo -e "${_NC}";
+        echo -e "${_G}No Redis info found${_NC}";
+        echo "";
     else
-        _conf="$(find /etc/redis-multi/ -type f -iname "${_getusr}.redis.conf")";
-        _port="$(grep "^port" "${_conf}" |awk '{print $2}')";
-        _socket="$(grep unixsocket "${_conf}" | head -n1 | awk '{print $2}')";
-        _host="$(grep bind "${_conf}" | awk '{print $2}')";
-        _logfile="$(grep logfile "${_conf}" | awk '{print $2}')";
-        _pidfile="$(grep pidfile "${_conf}" | awk '{print $2}')";
-        if [[ "${_host}" == "0.0.0.0" || "${_port}" == "0" ]]; then
+        if [[ "${_hostname}" != "cloudhost" && -n ${_nkredis} ]]; then
             echo "";
             echo -e "${_B}Redis Info";
             echo -e "--------------";
-            echo -e "${_G}Owner: ${_getusr}";
-            echo -e "Socket: ${_socket}";
-            sudo -u "${_getusr}" redis-cli -s "${_socket}" info | grep --color=auto --color=auto -E 'uptime|human|evict|^db' | grep --color=auto --color=auto -Ev 'system|lua|rss|seconds|scripts|mem_not' | sed 's/_human//g';
-            echo -e "Log file: ${_logfile}";
-            echo -e "Pid file: ${_pidfile}";
-            echo -e "$_NC";
-        else
-            echo "";
-            echo -e "${_B}Redis Info";
-            echo -e "--------------${_NC}";
-            echo -e "${_G}Owner: ${_getusr}";
-            echo -e "Host: ${_host}:${_port}";
-            sudo -u "${_getusr}" redis-cli -h "${_host}" -p "${_port}" info | grep --color=auto --color=auto -E 'uptime|human|evict|^db' | grep --color=auto --color=auto -Ev 'system|lua|rss|seconds|scripts|mem_not' | sed 's/_human//g';
-            echo -e "Log file: ${_logfile}";
-            echo -e "Pid file: ${_pidfile}";
+            echo -e "${_G}${_nkredis}";
             echo -e "${_NC}";
+        else
+            _conf="$(find /etc/redis-multi/ -type f -iname "${_getusr}.redis.conf")";
+            _port="$(grep "^port" "${_conf}" |awk '{print $2}')";
+            _host="$(grep bind "${_conf}" | awk '{print $2}')";
+            _logfile="$(grep logfile "${_conf}" | awk '{print $2}')";
+            _pidfile="$(grep pidfile "${_conf}" | awk '{print $2}')";
+            if [[ "${_host}" == "0.0.0.0" || "${_port}" == "0" ]]; then
+                _socket="$(grep unixsocket "${_conf}" | head -n1 | awk '{print $2}')";
+                echo "";
+                echo -e "${_B}Redis Info";
+                echo -e "--------------";
+                echo -e "${_G}Owner: ${_getusr}";
+                echo -e "Socket: ${_socket}";
+                sudo -u "${_getusr}" redis-cli -s "${_socket}" info | grep --color=auto --color=auto --color=auto -E 'uptime|human|evict|^db' | grep --color=auto --color=auto --color=auto -Ev 'system|lua|rss|seconds|scripts|mem_not' | sed 's/_human//g';
+                echo -e "Log file: ${_logfile}";
+                echo -e "Pid file: ${_pidfile}";
+                echo -e "$_NC";
+            else
+                echo "";
+                echo -e "${_B}Redis Info";
+                echo -e "--------------${_NC}";
+                echo -e "${_G}Owner: ${_getusr}";
+                echo -e "Host: ${_host}:${_port}";
+                sudo -u "${_getusr}" redis-cli -h "${_host}" -p "${_port}" info | grep --color=auto --color=auto --color=auto -E 'uptime|human|evict|^db' | grep --color=auto --color=auto --color=auto -Ev 'system|lua|rss|seconds|scripts|mem_not' | sed 's/_human//g';
+                echo -e "Log file: ${_logfile}";
+                echo -e "Pid file: ${_pidfile}";
+                echo -e "${_NC}";
+            fi;
         fi;
     fi
 }
