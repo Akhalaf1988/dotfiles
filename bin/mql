@@ -199,7 +199,7 @@ _dbinfoUchk(){
 _dbinfoEchk(){
 
     WL="$(cat ~/myfile.txt)";
-    E="$(sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a listMysqlDatabases | awk '{print $1}' | grep $DB$)";
+    E="$(sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a listMysqlDatabases | awk '{print $1}' | grep ^$DB$)";
     if [[ -n "$E" && "$WL" == "-d" || -n "$E" && "$WL" == "-eu" || -n "$E" && "$WL" == "-ud" || -n "$E" && "$WL" == "-cp" ]]; then
         echo -e ""$RED"DB already exists"$NC"";
         _dbinfo;
@@ -209,7 +209,7 @@ _dbinfoEchk(){
 }
 _dbchk(){
 
-    M="$(sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a listMysqlDatabases | awk '{print $1}' | grep $DB$)";
+    M="$(sudo siteworx -u --login_domain="$DOM" -n -c MysqlDb -a listMysqlDatabases | awk '{print $1}' | grep ^$DB$)";
     if [[ -z "$M" && "$WL" == "-ed" || -z "$M" && "$WL" == "-eud" || -z "$M" && "$WL" == "-c" || -z "$M" && "$WL" == "-i" ]]; then
         echo -e ""$RED"No DB found"$NC"";
         _dbinfo;
@@ -241,7 +241,7 @@ _uinfoUchk(){
 _uexistchk(){
 
     WL="$(cat ~/myfile.txt)";
-    UC="$(sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a listMysqlUsers | awk '{print $1}' | grep $U$)";
+    UC="$(sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a listMysqlUsers | awk '{print $1}' | grep ^$U$)";
     if [[ -n "$UC" && "$WL" == "-u" || -n "$UC" && "$WL" == "-U" || -n "$UC" && "$WL" == "-ed" || -n "$UC" && "$WL" == "-ud" || -n "$UC" && "$WL" == "-cp" ]]; then
         echo -e ""$RED"User already exists"$NC"";
         _uinfo;
@@ -262,7 +262,7 @@ _uinfoLchk(){
 _userNFC(){
 
     WL="$(cat ~/myfile.txt)";
-    K="$(sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a listMysqlUsers | awk '{print $1}' | grep $U$)";
+    K="$(sudo siteworx -u --login_domain="$DOM" -c MysqlUser -n -a listMysqlUsers | awk '{print $1}' | grep ^$U$)";
     if [[ -z "$K" && "$WL" == "-eud" || -z "$K" && "$WL" == "-eu" ]]; then
         echo -e ""$RED"No user found"$NC"";
         _uinfo;
