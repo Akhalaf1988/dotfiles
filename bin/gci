@@ -1,0 +1,36 @@
+gci ()
+{
+    local _VARNPORT _VARNHOST _ESPORT _ESHOST _CURL _ACCID _SITEID _R _NC _B _G _DOM;
+    _G='\033[0;32m';
+    _B='\033[1;34m';
+    _NC='\033[0m';
+    _R='\033[0;31m';
+    _DOM="$(pwd | cut -d/ -f4)";
+    _SITEID="$(/usr/local/interworx/bin/config.pex --list --siteworx ${_DOM} | grep "account_id" | awk '{print $2}')";
+    _ACCID="$(/usr/local/interworx/bin/config.pex --list --siteworx ${_DOM} | grep "client_id" | awk '{print $2}')";
+    _CURL="$(curl --silent "https://nocworx.nexcess.net/api/v1/as-client/${_ACCID}/v1/cloud-account/${_SITEID}/container" -H "Authorization: Bearer ${NWTOKEN}" -H "Accept: application/json" | jq '.')";
+    _ESHOST="$(echo "${_CURL}" | grep "cg-" | grep elastic | awk '{print $2}' | sed 's/\"//g;s/,//g')";
+    _ESPORT="$(echo "${_CURL}" | grep -A40 "\-elasticsearch" | grep "publish_port" | awk '{print $2}' | sed 's/,//g')";
+    _VARNHOST="$(echo "${_CURL}" | grep  "cg-" | grep "varnish" | awk '{print $2}' | sed 's/\"//g;s/,//g')";
+    _VARNPORT="$(echo "${_CURL}" | grep -A40 "\-varnish" | grep "publish_port"  | awk '{print $2}' | sed 's/,//g')";
+    echo "";
+    echo -e "${_B}Container info";
+    echo -e "${_B}---------------${_NC}";
+    if [[ -z "${_ESHOST}" ]]; then
+        echo -e "${_R}No Elastic container Setup${_NC}";
+    else
+        echo -e "${_B}Elastic Search Host: ${_G}${_ESHOST}.nxcli.net${_NC}";
+        echo -e "${_B}Elastic Search Port: ${_G}${_ESPORT}${_NC}";
+    fi;
+    if [[ -z "${_VARNHOST}" ]]; then
+        echo "";
+        echo -e "${_R}No Varnish Container Setup${_NC}";
+        echo "";
+    else
+        echo "";
+        echo -e "${_B}Varnish Host: ${_G}${_VARNHOST}.nxcli.net${_NC}";
+        echo -e "${_B}Varnish Port: ${_G}${_VARNPORT}${_NC}";
+        echo "";
+    fi;
+    unset _NC _G _B _R _VARNPORT _VARNHOST _ESPORT _ESHOST _CURL _ACCID _SITEID
+}
