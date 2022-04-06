@@ -6,9 +6,9 @@ gci ()
     _NC='\033[0m';
     _R='\033[0;31m';
     _DOM="$(pwd | cut -d/ -f4)";
-    _Vhost="$(find /etc/httpd/conf.d/ -type f -iname vhost_*.conf | cut -d/ -f5 | sed 's/vhost_//g;s/\.conf//g'  | grep "${_DOM}")";
-    _SITEID="$(/usr/local/interworx/bin/config.pex --list --siteworx ${_DOM} | grep "account_id" | awk '{print $2}')";
-    _ACCID="$(/usr/local/interworx/bin/config.pex --list --siteworx ${_DOM} | grep "client_id" | awk '{print $2}')";
+    _Vhost="$(find /etc/httpd/conf.d/ -type f -iname "vhost_*.conf" | cut -d/ -f5 | sed 's/vhost_//g;s/\.conf//g'  | grep "${_DOM}")";
+    _SITEID="$(/usr/local/interworx/bin/config.pex --list --siteworx "${_DOM}" | grep "account_id" | awk '{print $2}')";
+    _ACCID="$(/usr/local/interworx/bin/config.pex --list --siteworx "${_DOM}" | grep "client_id" | awk '{print $2}')";
     _CURL="$(curl --silent "https://nocworx.nexcess.net/api/v1/as-client/${_ACCID}/v1/cloud-account/${_SITEID}/container" -H "Authorization: Bearer ${NWTOKEN}" -H "Accept: application/json" | jq '.')";
     _ESHOST="$(echo "${_CURL}" | grep "cg-" | grep elastic | awk '{print $2}' | sed 's/\"//g;s/,//g')";
     _ESPORT="$(echo "${_CURL}" | grep -A40 "\-elasticsearch" | grep "publish_port" | awk '{print $2}' | sed 's/,//g')";
