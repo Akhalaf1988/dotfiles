@@ -1,6 +1,6 @@
 getcdn ()
 {
-    local _CDN _CURL _ACCID _SITEID _R _NC _B _G _DOM;
+    local _CDN _CURL _ACCID _SITEID _R _NC _B _G _DOM _CDNP;
     _G='\033[0;32m';
     _B='\033[1;34m';
     _NC='\033[0m';
@@ -29,4 +29,5 @@ getcdn ()
             echo "";
         fi;
     fi
+    unset _CDN _CURL _ACCID _SITEID _R _NC _B _G _DOM _CDNP;
 }
