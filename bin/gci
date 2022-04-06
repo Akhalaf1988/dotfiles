@@ -6,31 +6,49 @@ gci ()
     _NC='\033[0m';
     _R='\033[0;31m';
     _DOM="$(pwd | cut -d/ -f4)";
-    _SITEID="$(/usr/local/interworx/bin/config.pex --list --siteworx "${_DOM}" | grep "account_id" | awk '{print $2}')";
-    _ACCID="$(/usr/local/interworx/bin/config.pex --list --siteworx "${_DOM}" | grep "client_id" | awk '{print $2}')";
+    _Vhost="$(find /etc/httpd/conf.d/ -type f -iname vhost_*.conf | cut -d/ -f5 | sed 's/vhost_//g;s/\.conf//g'  | grep "${_DOM}")";
+    _SITEID="$(/usr/local/interworx/bin/config.pex --list --siteworx ${_DOM} | grep "account_id" | awk '{print $2}')";
+    _ACCID="$(/usr/local/interworx/bin/config.pex --list --siteworx ${_DOM} | grep "client_id" | awk '{print $2}')";
     _CURL="$(curl --silent "https://nocworx.nexcess.net/api/v1/as-client/${_ACCID}/v1/cloud-account/${_SITEID}/container" -H "Authorization: Bearer ${NWTOKEN}" -H "Accept: application/json" | jq '.')";
     _ESHOST="$(echo "${_CURL}" | grep "cg-" | grep elastic | awk '{print $2}' | sed 's/\"//g;s/,//g')";
     _ESPORT="$(echo "${_CURL}" | grep -A40 "\-elasticsearch" | grep "publish_port" | awk '{print $2}' | sed 's/,//g')";
     _VARNHOST="$(echo "${_CURL}" | grep  "cg-" | grep "varnish" | awk '{print $2}' | sed 's/\"//g;s/,//g')";
     _VARNPORT="$(echo "${_CURL}" | grep -A40 "\-varnish" | grep "publish_port"  | awk '{print $2}' | sed 's/,//g')";
-    echo "";
-    echo -e "${_B}Container info";
-    echo -e "${_B}---------------${_NC}";
-    if [[ -z "${_ESHOST}" ]]; then
-        echo -e "${_R}No Elastic container Setup${_NC}";
-    else
-        echo -e "${_B}Elastic Search Host: ${_G}${_ESHOST}.nxcli.net${_NC}";
-        echo -e "${_B}Elastic Search Port: ${_G}${_ESPORT}${_NC}";
-    fi;
-    if [[ -z "${_VARNHOST}" ]]; then
+    _RABBHOST="$(echo "${_CURL}" | grep "cg\-"  | grep rabbitmq | awk '{print $2}' | sed 's/\"//g;s/,//g')";
+    _RABBPORT="$(echo "${_CURL}" | grep -A40 "\-rabbit" | grep "publish_port"  | awk '{print $2}' | sed 's/,//g')";
+    if [[ -z "${_DOM}" || -z "${_Vhost}" ]]; then
         echo "";
-        echo -e "${_R}No Varnish Container Setup${_NC}";
-        echo "";
+        echo -e "${_R}Has to be ran from a domain directory";
+        echo -e "${_NC}";
     else
         echo "";
-        echo -e "${_B}Varnish Host: ${_G}${_VARNHOST}.nxcli.net${_NC}";
-        echo -e "${_B}Varnish Port: ${_G}${_VARNPORT}${_NC}";
-        echo "";
+        echo -e "${_B}Container info";
+        echo -e "${_B}---------------${_NC}";
+        if [[ -z "${_ESHOST}" ]]; then
+            echo -e "${_R}No Elastic container Setup${_NC}";
+        else
+            echo -e "${_B}Elastic Search Host: ${_G}${_ESHOST}.nxcli.net${_NC}";
+            echo -e "${_B}Elastic Search Port: ${_G}${_ESPORT}${_NC}";
+        fi;
+        if [[ -z "${_VARNHOST}" ]]; then
+            echo "";
+            echo -e "${_R}No Varnish Container Setup${_NC}";
+            echo "";
+        else
+            echo "";
+            echo -e "${_B}Varnish Host: ${_G}${_VARNHOST}.nxcli.net${_NC}";
+            echo -e "${_B}Varnish Port: ${_G}${_VARNPORT}${_NC}";
+        fi;
+        if [[ -z "${_RABBHOST}" ]]; then
+            echo "";
+            echo -e "${_R}No RabbitMQ Container Setup${_NC}";
+            echo "";
+        else
+            echo "";
+            echo -e "${_B}RabbitMQ Host: ${_G}${_RABBHOST}.nxcli.net${_NC}";
+            echo -e "${_B}RabbitMQ Port: ${_G}${_RABBPORT}${_NC}";
+            echo "";
+        fi;
     fi;
-    unset _NC _G _B _R _VARNPORT _VARNHOST _ESPORT _ESHOST _CURL _ACCID _SITEID
+    unset _NC _G _B _R _VARNPORT _VARNHOST _ESPORT _RABBHOST _RABBPORT _ESHOST _CURL _ACCID _SITEID
 }
