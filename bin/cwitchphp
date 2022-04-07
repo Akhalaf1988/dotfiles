@@ -1,0 +1,46 @@
+cwitchphp ()
+{
+    local _CDN _CURL _ACCID _SITEID _R _NC _B _G _DOM;
+    _G='\033[0;32m';
+    _B='\033[1;34m';
+    _NC='\033[0m';
+    _R='\033[0;31m';
+    _DOM="$(pwd | cut -d/ -f4)";
+    _Vhost="$(find /etc/httpd/conf.d/ -type f -iname "vhost_*.conf" | cut -d/ -f5 | sed 's/vhost_//g;s/\.conf//g'  | grep "${_DOM}")";
+    _SITEID="$(/usr/local/interworx/bin/config.pex --list --siteworx "${_DOM}" | grep "account_id" | awk '{print $2}')";
+    _ACCID="$(/usr/local/interworx/bin/config.pex --list --siteworx "${_DOM}" | grep "client_id" | awk '{print $2}')";
+    if [[ -z "${_DOM}" || -z "${_Vhost}" ]]; then
+        echo "";
+        echo -e "${_R}Has to be ran from a domain directory";
+        echo -e "${_NC}";
+    else
+        if [[ -z "$1" ]]; then
+            echo "";
+            echo -e "${_R}This command requires one argument";
+            echo -e "$_NC";
+        else
+            _PHPV="$1";
+            _PHPCHECK="$(echo "${_PHPV}" | grep '\.')";
+            if [[ -z "$_PHPCHECK" ]]; then
+                _PHPVERSON="$(echo "${_PHPV}" | sed 's/.$/.&/')";
+            else
+                _PHPVERSON="$1";
+            fi;
+            if [[ "$_PHPVERSON" == "5.6" || "$_PHPVERSON" == "7.0" \
+            || "$_PHPVERSON" == "7.1" || "$_PHPVERSON" == "7.2" \
+            || "$_PHPVERSON" == "7.3" || "$_PHPVERSON" == "7.4" \
+            || "$_PHPVERSON" == "8.0" || "$_PHPVERSON" == "8.1" ]]; then
+                _Switchphp="$(curl --silent -X POST "https://nocworx.nexcess.net/api/v1/as-client/${_ACCID}/v1/cloud-account/${_SITEID}/phpversion" \
+                -H "Authorization: Bearer ${NWTOKEN}" -H "Accept: application/json" \
+                -d '{"php_version":"$_PHPVERSON", "skip_compatibility_check":"true"}')";
+                echo "";
+                echo -e "${_G}Changing php version to ${_PHPVERSON}${_NC}";
+                echo "${_Switchphp}"
+            else
+                echo "";
+                echo -e "${_R}Not a valid php version for this server${_NC}";
+                echo "";
+            fi;
+        fi;
+    fi
+}
