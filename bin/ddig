@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+
+import socket
+import os
+import sys
+import re
+import subprocess
+
+
+GREEN = '\033[0;36m'
+RED = '\033[1;32;31m'
+NC = '\033[1;0;40m'
+Dash = '------------------'
+
+if len(sys.argv) > 1:
+    domain = sys.argv[1]
+else:
+    domain = input(GREEN + "Enter a domain: " + NC)
+try:
+    socket.gethostbyname_ex(domain)
+except socket.gaierror:
+    print("")
+    print(RED + "Could not resolve domain" + NC)
+    print("")
+    sys.exit()
+else:
+    MX_info = subprocess.check_output(['dig', '+short', 'MX', domain])
+    MXstr_data = MX_info.decode('utf-8')
+    MX_record = MXstr_data.split()
+    MX_Clean = re.sub("[\[\]',]","",str(MX_record))
+    TXT_info=subprocess.check_output(['dig', '+short', 'TXT', domain])
+    TXTstr_data=TXT_info.decode('utf-8')
+    TXT_record=TXTstr_data.split()
+    TXT_Clean=re.sub("[\[\]',]","",str(TXT_record))
+    NS_info = subprocess.check_output(['dig', '+short', 'NS', domain])
+    NSstr_data = NS_info.decode('utf-8')
+    NS_record = NSstr_data.split()
+    NS_Clean = re.sub("[\[\]',]","",str(NS_record))
+    IP = socket.gethostbyname_ex(domain)
+    Arec = re.sub("[\[\]']","",str(IP[2]))
+    print("")
+    print(GREEN + "DNS Summary" + NC)
+    print(Dash)
+if(not Arec):
+    print(str(GREEN + "A record: " + NC) + str(RED + "No A record found" + NC))
+else:
+    print(str(GREEN + "A record: " + NC) + str(Arec))
+    print(Dash)
+### Start MX Section ##
+
+#MX record info
+if(not MX_Clean):
+    print(str(GREEN + "MX record: ") + str(RED + "No MX record found" + NC))
+    print(Dash)
+else:
+    print(str(GREEN + "MX record: " + NC) + str(MX_Clean))
+    print(Dash)
+##TXT info ##
+if(not TXT_Clean):
+    print(str(GREEN + "TXT record: ") + str(RED + "No TXT record found" + NC))
+    print(Dash)
+else:
+    print(str(GREEN + "TXT record: " + NC) + str(TXT_Clean))
+    print(Dash)
+### name server info ##
+if(not NS_Clean):
+    print(str(GREEN + "Name server: ") + str(RED + "No name server found" + NC))
+    print(Dash)
+else:
+    print(str(GREEN + "Name server: " + NC) + str(NS_Clean))
+    print(Dash)
