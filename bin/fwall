@@ -1,303 +1,201 @@
 #! /usr/bin/env bash
 
-readonly AWK='/bin/awk'
-readonly CAT='/bin/cat'
-readonly CUT='/bin/cut'
-readonly GREP='/bin/grep'
-readonly LS='/bin/ls'
+main(){
+ check $@
+}
 
+
+check ()
+{
+    local OPTIND opt i;
+    while getopts a:lho:r: opt; do
+        case $opt in
+            a)
+                _IP="$OPTARG";
+                _domchk;
+                _service;
+                _addIP
+            ;;
+            h)
+                _helpsec
+            ;;
+            l)
+                _domchk;
+                _listIPS
+            ;;
+            o)
+                _IP="$OPTARG";
+                _domchk;
+                _apfchk
+            ;;
+            r)
+                _IP="$OPTARG";
+                _domchk;
+                _service;
+                _rmIP
+            ;;
+            *)
+                _helpsec
+            ;;
+        esac;
+    done;
+    shift $((OPTIND -1))
+}
 ### CHECK PATH ###
 _domchk ()
 {
-    D="$(pwd | "$CUT" -d/ -f4)";
-    V="$("$LS" /etc/httpd/conf.d/ | "$GREP" "vhost_"$D".conf")";
-
-
-    if [[ -n "$V" ]]; then
-        DOM="$D";
+    _D="$(pwd | cut -d/ -f4)";
+    _V="$(find /etc/httpd/conf.d/ -iname "vhost*" | grep "${_D}")";
+    if [[ -n "$_V" ]]; then
+        _DOM="$_D";
+        _swrxd="$(echo "sudo siteworx -u --login_domain=${_DOM}")"
+        _addipc="$(echo "-c firewall -n -a addRule --ip")"
+        _rmipc="$(echo "-c Firewall -n -a removeRule")"
     else
-        _domchk2
+        echo "has to be ran from domain directory"
+        exit
     fi
 }
 
-_domchk2(){
-    echo -n "Domain: "
-    read DO
-    _domchk3
-}
-_domchk3(){
-if [[ -z "$DO" ]]; then
- echo "No domain given"
-  _domchk2
-else
-  _vhostchk
-fi
-}
-_vhostchk(){
-S="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | wc -l)"
-R="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | tail -n1)"
-if [[ -z "$R" ]]; then
-     echo "No domain found"
-     _domchk2
-else
-  if [[ "$S" == "1" ]]; then
-DOM="$R"
-echo "Using the domain "$R""
-else
-echo "
-Domain ambiguous: Choose domain
-"
-_domlist
- fi
-fi
-}
-
-_domlist(){
-ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | nl
-
-echo -n "
-Choose Domain: "
-read P
-Q="$(ls -l /etc/httpd/conf.d/ | awk '{print $9}' | grep vhost | cut -d_ -f2 | sed -e 's/.conf//g' | grep  ^$DO | nl | grep "     $P" | awk '{print $2}')"
-DOM="$Q"
-}
-
-
-_askIP(){
-   echo -n "IP: "
-   read IP
-   _ipchk
-}
-
-_ipchk(){
-
-if [[ -z "$IP" ]]; then
-   echo "No IP given"
-_askIP
-fi
-}
-
-
-_service(){
-  echo -n "Service [ssh/sftp/ftp/mysql/all]: "
-   read SER
-}
-
-_servicechk(){
-if [[ -z "$SER" ]]; then
-   echo "No service given"
-_service
-else
-if [[ "$SER" == "ssh" || "$SER" == "s" || "$SER" == "ftp" \
-|| "$SER" == "f" || "$SER" == "sftp" || "$SER" == "sf" \
-|| "$SER" == "mysql" || "$SER" == "m" || "$SER" == "all" \
-|| "$SER" == "a" ]]; then
-   _flow
-else
-   echo "Not a supported option"
-  _service
- fi
-fi
-}
-
-_flow(){
-  echo -n "Flow? [in/out]: "
-  read FLOW
-}
-_flowchk(){
-if [[ "$FLOW" == "in" || "$FLOW" == "out" ]]; then
-   echo -n ""
-else
-   _flow
-fi
-}
-
-_cidr(){
-  echo "cidr range: "
-  read CIDR
-_cidrchk
-}
-_cidrchk(){
-if [[ -z "$CIDR" ]]; then
-   echo "No Range given"
-_cidr
-fi
-}
-_addIP(){
-if [[ "$SER" == "ssh" || "$SER" == "s" ]]; then
-   _sshadd
-else
-if [[ "$SER" == "ftp" || "$SER" == "f" ]]; then
-   _ftpadd
-else
-if [[ "$SER" == "sftp" || "$SER" == "sf" ]]; then
-   _sftpadd
-else
-if [[ "$SER" == "mysql" || "$SER" == "m" ]]; then
-   _mysqladd
-else
-if [[ "$SER" == "all" || "$SER" == "a" ]]; then
-   _sshadd
-   _ftpadd
-   _mysqladd
-   _sftpadd
+###echo service list###
+_service ()
+{
+    _H="$(echo "$(hostname | cut -d- -f1)")";
+    if [[ "${_H}" == "cloudhost" ]]; then
+        _SER='mysql';
+    else
+        echo -n "Pick a Service [ssh/sftp/ftp/mysql]: ";
+        read -r _SER;
+    fi;
+    if [[ -z "${_SER}" ]]; then
+        echo "No service given";
+        _service;
     fi
-   fi
-  fi
- fi
-fi
 }
 
-_sshadd(){
-sudo siteworx -u --login_domain="$DOM" -c firewall -n \
--a addRule --ip "$IP" --service ssh
+###add ip in siteworx###
+_addIP ()
+{
+    case $_SER in
+        ssh)
+            echo "";
+            echo -e "Whitelisting ${_IP} for ssh";
+            ${_swrxd} ${_addipc} "${_IP}" --service ssh;
+            echo ""
+        ;;
+        sftp)
+            echo "";
+            echo -e "Whitelisting ${_IP} for sftp";
+            ${_swrxd} ${_addipc} "${_IP}" --service sftp;
+            echo ""
+        ;;
+        ftp)
+            echo "";
+            echo -e "Whitelisting ${_IP} for ftp";
+            ${_swrxd} ${_addipc} "${_IP}" --service ftp;
+            echo ""
+        ;;
+        mysql)
+            echo "";
+            echo -e "Whitelisting ${_IP} for mysql";
+            ${_swrxd} ${_addipc} "${_IP}" --service mysql;
+            echo ""
+        ;;
+        all)
+            echo "";
+            echo -e "Whitelisting ${_IP} for all Services";
+            servicelist=("ssh" "sftp" "ftp" "mysql");
+            for _serv in ${servicelist[*]};
+            do
+                ${_swrxd} ${_addipc} "${_IP}" --service ${_serv};
+            done;
+            echo ""
+        ;;
+        *)
+            echo "";
+            echo -e "Not a Valid Option";
+            echo ""
+        ;;
+    esac
 }
-
-_ftpadd(){
-sudo siteworx -u --login_domain="$DOM" -c firewall \
--n -a addRule --ip "$IP" --service ftp
-}
-
-_sftpadd(){
-sudo siteworx -u --login_domain="$DOM" -c firewall -n \
--a addRule --ip "$IP" --service sftp
-}
-
-_mysqladd(){
-sudo siteworx -u --login_domain="$DOM" -c firewall -n \
--a addRule --ip "$IP" --service mysql
-}
-##advance
-
-_sshadda(){
-sudo siteworx -u --login_domain="$DOM" -c firewall -n \
--a addRule --ip "$IP" --service ssh --flow "$FLOW" --cidr "$CIDR"
-}
-
-_ftpadda(){
-sudo siteworx -u --login_domain="$DOM" -c firewall \
--n -a addRule --ip "$IP" --service ftp --flow "$FLOW" --cidr "$CIDR"
-}
-
-_sftpadda(){
-sudo siteworx -u --login_domain="$DOM" -c firewall -n \
--a addRule --ip "$IP" --service sftp --flow "$FLOW" --cidr "$CIDR"
-}
-
-_mysqladda(){
-sudo siteworx -u --login_domain="$DOM" -c firewall -n \
--a addRule --ip "$IP" --service mysql --flow "$FLOW" --cidr "$CIDR"
-}
-
-
 
 ############################
 ############################
-_rmIP(){
-if [[ "$SER" == "ssh" || "$SER" == "s" ]]; then
-   _sshrm
-else
-if [[ "$SER" == "ftp" || "$SER" == "f" ]]; then
-   _ftprm
-else
-if [[ "$SER" == "sftp" || "$SER" == "sf" ]]; then
-   _sftprm
-else
-if [[ "$SER" == "mysql" || "$SER" == "m" ]]; then
-   _mysqlrm
-else
-if [[ "$SER" == "all" || "$SER" == "a" ]]; then
-   _sshrm
-   _ftprm
-   _mysqlrm
-   _sftprm
-    fi
-   fi
-  fi
- fi
-fi
+###remove ip from siteworx###
+_rmIP ()
+{
+    case $_SER in
+        ssh)
+            echo "";
+            echo -e "Delisting ${_IP} for SSH";
+            ${_swrxd} ${_rmipc} --service ssh --ip ${_IP};
+            echo ""
+        ;;
+        sftp)
+            echo "";
+            echo -e "Delisting ${_IP} for SFTP";
+            ${_swrxd} ${_rmipc} "${_IP}" --service sftp;
+            echo ""
+        ;;
+        ftp)
+            echo "";
+            echo -e "Delisting ${_IP} for FTP";
+            ${_swrxd} ${_rmipc} "${_IP}" --service ftp;
+            echo ""
+        ;;
+        mysql)
+            echo "";
+            echo -e "Delisting ${_IP} for Mysql";
+            ${_swrxd} ${_rmipc} "${_IP}" --service mysql;
+            echo ""
+        ;;
+        all)
+            echo "";
+            echo -e "Delisting ${_IP} for all Services";
+            servicelist=("ssh" "sftp" "ftp" "mysql");
+            for _serv in ${servicelist[*]};
+            do
+                ${_swrxd} ${_rmipc} "${_IP}" --service ${_serv};
+            done;
+            echo ""
+        ;;
+        *)
+            echo "";
+            echo -e "${_R}Not a Valid Option${_NC}";
+            echo ""
+        ;;
+    esac
 }
-
-_sshrm(){
-sudo siteworx -u --login_domain="$DOM" -c Firewall -n \
--a removeRule --service ssh --flow "$FLOW" --ip "$IP"
-}
-_sftprm(){
-sudo siteworx -u --login_domain="$DOM" -c Firewall -n \
--a removeRule --service sftp --flow "$FLOW" --ip "$IP"
-}
-_ftprm(){
-sudo siteworx -u --login_domain="$DOM" -c Firewall -n \
--a removeRule --service ftp --flow "$FLOW" --ip "$IP"
-}
-_mysqlrm(){
-sudo siteworx -u --login_domain="$DOM" -c Firewall -n \
--a removeRule --service mysql --flow "$FLOW" --ip "$IP"
+###check iptables for an ip###
+_apfchk(){
+     iptables-save | grep "${_IP}"
 }
 
 ################################LISTING
+###Get a listing of current ips###
 _listIPS(){
 
-U="$(sudo siteworx -u --login_domain="$DOM" -c firewall -a listIps | awk '{print $1, $2, $5}')"
-R="$(sudo siteworx -u --login_domain="$DOM" -c firewall -a listIps | awk '{print $6, $7, $8, $9, $10, $11, $12, $13}' | grep -Eo "([0-9]{1,3}[\.]){3}[0-9]{1,3}")"
-echo "Firewall Summary: "$DOM"
-------------------------------"
-paste -d ' | '  <(echo "$U")  <(echo "$R") | column -t
+      echo "Firewall Summary: ${_DOM}"
+      echo "------------------------------"
+     ${_swrxd} -c firewall -a listIps
 }
 
-_add(){
-_domchk
-_askIP
-_service
-_servicechk
-_flowchk
-_addIP
-}
-_rm(){
-_domchk
-_askIP
-_service
-_servicechk
-_flowchk
-_rmIP
-}
-
+###show help options###
 _helpsec(){
 
-     "$CAT" <<- EOF
+     cat <<- EOF
 
-Usage: fwall arugument: ex: fwall -r
+Usage: fwall option ip
 
-         Supported Aruguments:
+         Supported options:
 
-         -a|--add      adds an ip
-         -r|--remove   removes an ip
-         -h|--help     shows this message
-         -l|--list     lists all ips whitelisted
-
-Used to check if an ip address is whitelisted and can be used to whitelist one or remove one.
-If you are outside of the doc root it will ask for a domain otherwise it
-needs the ip address, service and in or outbound connection.
-When asked for the service you can pick ssh/s, ftp/f, sftp/sf, mysql/m or all/a
-Needs to know the flow direction, can only type in or out in that section.
+         -a     adds an ip
+         -r     removes an ip
+         -h     shows this message
+         -l     lists all ips whitelisted in siteworx
+         -o     List ips from iptables-save
 
 EOF
 }
-if [[ "$1" == "-l" || "$1" == "--list" ]]; then
-_domchk
-_listIPS
-else
-if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-   _helpsec
-else
-if [[ "$1" == "-r" || "$1" == "--remove" ]]; then
-   _rm
-else
-if [[ "$1" == "-a" || "$1" == "--add" ]]; then
-   _add
-else
- _add
-   fi
-  fi
- fi
-fi
+
+main $@
