@@ -180,10 +180,10 @@ _gatherinfo(){
        _dbpass=$(sudo grep -E 'password|DB_PASSWORD' "${_usrpath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
        _dbhost=$(sudo grep -E 'host' "${_usrpath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
     else
-       _db="$(echo "cat /config/global/resources/default_setup/connection/dbname/text()" | xmllint --nocdata --shell ${_usrpath}/MA-dbinfo.txt | sed '1d;$d')"
-       _dbu="$(echo "cat /config/global/resources/default_setup/connection/username/text()" | xmllint --nocdata --shell ${_usrpath}/MA-dbinfo.txt | sed '1d;$d')"
-       _dbpass="$(echo "cat /config/global/resources/default_setup/connection/password/text()" | xmllint --nocdata --shell ${_usrpath}/MA-dbinfo.txt | sed '1d;$d')"
-       _dbhost="$(echo "cat /config/global/resources/default_setup/connection/host/text()" | xmllint --nocdata --shell ${_usrpath}/MA-dbinfo.txt | sed '1d;$d')"
+       _db="$(echo "cat /config/global/resources/default_setup/connection/dbname/text()" | xmllint --nocdata --shell "${_usrpath}"/MA-dbinfo.txt | sed '1d;$d')"
+       _dbu="$(echo "cat /config/global/resources/default_setup/connection/username/text()" | xmllint --nocdata --shell "${_usrpath}"/MA-dbinfo.txt | sed '1d;$d')"
+       _dbpass="$(echo "cat /config/global/resources/default_setup/connection/password/text()" | xmllint --nocdata --shell "${_usrpath}"/MA-dbinfo.txt | sed '1d;$d')"
+       _dbhost="$(echo "cat /config/global/resources/default_setup/connection/host/text()" | xmllint --nocdata --shell "${_usrpath}"/MA-dbinfo.txt | sed '1d;$d')"
     fi
 }
 
