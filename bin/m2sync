@@ -1,7 +1,6 @@
 #! /usr/bin/env bash
 ###Created by Abe k for MA to MA migrations##
 # Script Arguments
-#readonly ARGS="$*"
 readonly ARGA=("$@")
 
 
@@ -269,7 +268,7 @@ _getphp(){
 
     echo -e "${_green}Checking PHP Version..."
     _sourcephp=$(sudo -u "${_usr}" ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${_usrpath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}"  "php -v" | head -n1 | awk '{print $2}' | cut -d\. -f1-2 |  sed 's/\.//g')
-    _targetphp=$(sudo grep source "${_usrpath}"/.bashrc | cut -d\/ -f4 | sed -r 's/php|u//g')
+    _targetphp=$(sudo grep source "${_usrpath}"/.bashrc | cut -d"/" -f4 | sed -r 's/php|u//g')
     _phpv=$(sudo grep source "${_usrpath}"/.bashrc | awk '{print $2}' | sed 's/enable/root\/usr\/bin\/php/g')
 
     if [[ "${_sourcephp}" != "${_targetphp}" ]]; then
