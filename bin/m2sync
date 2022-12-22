@@ -127,7 +127,7 @@ _testssh (){
     if [[ -e "${_usrpath}"/temp-MA.ed25519 ]]; then
        echo -e "${_green}Testing ssh connecting..${_nc}";
        sudo -u "${_usr}" ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${_usrpath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "echo -e '${_green}ssh connection successful\n${_nc}'" 2> /dev/null;
-       _lastcommand="$(echo "$?")";
+       _lastcommand="$?";
     fi
     if [ "${_lastcommand}" != 0 ]; then
         echo -e "${_red}ssh test failed\n${_nc}";
@@ -168,7 +168,7 @@ _gatherinfo(){
    ###Set variables and such###
     echo -e "${_green}Gathering Info..."
     sudo -u "${_usr}" ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${_usrpath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "stat ${_appdocroot}/app/etc/${_env}" > /dev/null
-    _nlastcommand="$(echo "$?")";
+    _nlastcommand="$?";
     if [ "${_nlastcommand}" != 0 ]; then
         exit 0
     fi
