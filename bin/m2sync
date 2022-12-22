@@ -250,9 +250,8 @@ _createdb(){
     _N="$(seq 99 | sort -R | tail -n1)";
     _pass="$(echo "${_W1}${_W2}${_W3}${_N}" | sed "s/'//g")"
     _Ramdom_num="$(shuf -i 111111-999999 -n 1)"
-    _ending=$(echo "${_Ramdom_num}")
-    _tdb="$(echo "${_usr}_${_ending}")"
-    _createdbnuser="$(sudo siteworx -u --login_domain="${_dom}" -n -c MysqlDb -a add --name "${_ending}" --create_user 1 --user "${_ending}" --password "${_pass}" --confirm_password "${_pass}" --host %;)"
+    _tdb="${_usr}_${_Ramdom_num}"
+    _createdbnuser="$(sudo siteworx -u --login_domain="${_dom}" -n -c MysqlDb -a add --name "${_Ramdom_num}" --create_user 1 --user "${_Ramdom_num}" --password "${_pass}" --confirm_password "${_pass}" --host %;)"
     echo -e "${_green}${_createdbnuser}"
 
 }
