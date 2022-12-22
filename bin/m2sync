@@ -1,6 +1,7 @@
 #! /usr/bin/env bash
 ###Created by Abe k for MA to MA migrations##
 # Script Arguments
+#readonly ARGS="$*"
 readonly ARGA=("$@")
 
 
@@ -75,7 +76,23 @@ _gethost (){
         *)
         ;;
     esac
+        read -r -p "${_cyan}Pick CMS Version (1/2): ${_nc}" _CMSVERSON;
+        case $_CMSVERSON in
+                1)
+                _cms='1'
+                _env="local.xml"
+                ;;
+                2)
+                _cms='2'
+                _env="env.php"
+                ;;
+                *)
+                echo -e "${_red}Not a supported version${_nc}"
+                exit 0
+                ;;
+         esac
 }
+
 
 #check diskspace on local#
 _dschk(){
@@ -149,26 +166,39 @@ _askkey(){
 
 _gatherinfo(){
    ###Set variables and such###
-   echo -e "${_green}Gathering Info..."
-    sudo -u "${_usr}" ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${_usrpath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "stat ${_appdocroot}/app/etc/env.php" > /dev/null
+    echo -e "${_green}Gathering Info..."
+    sudo -u "${_usr}" ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${_usrpath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "stat ${_appdocroot}/app/etc/${_env}" > /dev/null
     _nlastcommand="$(echo "$?")";
     if [ "${_nlastcommand}" != 0 ]; then
         exit 0
     fi
-   sudo -u "${_usr}" ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${_usrpath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "cat ${_appdocroot}/app/etc/env.php" | sudo tee "${_usrpath}"/MA-dbinfo.txt > /dev/null
-   _db=$(sudo grep -E 'dbname|DB_NAME' "${_usrpath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
-   _dbu=$(sudo grep -E 'username|DB_USER' "${_usrpath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
-   _dbpass=$(sudo grep -E 'password|DB_PASSWORD' "${_usrpath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
-   _dbhost=$(sudo grep -E 'host' "${_usrpath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
+    sudo -u "${_usr}" ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${_usrpath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "cat ${_appdocroot}/app/etc/${_env}" | sudo tee "${_usrpath}"/MA-dbinfo.txt > /dev/null
+
+    if [[ "${_cms}" == "2" ]]; then
+       _db=$(sudo grep -E 'dbname|DB_NAME' "${_usrpath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
+       _dbu=$(sudo grep -E 'username|DB_USER' "${_usrpath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
+       _dbpass=$(sudo grep -E 'password|DB_PASSWORD' "${_usrpath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
+       _dbhost=$(sudo grep -E 'host' "${_usrpath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
+    else
+       _db="$(echo "cat /config/global/resources/default_setup/connection/dbname/text()" | xmllint --nocdata --shell ${_usrpath}/MA-dbinfo.txt | sed '1d;$d')"
+       _dbu="$(echo "cat /config/global/resources/default_setup/connection/username/text()" | xmllint --nocdata --shell ${_usrpath}/MA-dbinfo.txt | sed '1d;$d')"
+       _dbpass="$(echo "cat /config/global/resources/default_setup/connection/password/text()" | xmllint --nocdata --shell ${_usrpath}/MA-dbinfo.txt | sed '1d;$d')"
+       _dbhost="$(echo "cat /config/global/resources/default_setup/connection/host/text()" | xmllint --nocdata --shell ${_usrpath}/MA-dbinfo.txt | sed '1d;$d')"
+    fi
 }
 
 _gatherinfofinal(){
-
-   _dbf=$(sudo grep -E 'dbname|DB_NAME' app/etc/env.php | cut -d \' -f 4 | head -n1)
-   _dbuf=$(sudo grep -E 'username|DB_USER' app/etc/env.php | cut -d \' -f 4 | head -n1)
-   _dbpassf=$(sudo grep -E 'password|DB_PASSWORD' app/etc/env.php | cut -d \' -f 4 | head -n1)
-   _dbhostf=$(sudo grep -E 'host' app/etc/env.php | cut -d \' -f 4 | head -n1)
-
+    if [[ "${_cms}" == "2" ]]; then
+       _dbf=$(sudo grep -E 'dbname|DB_NAME' app/etc/env.php | cut -d \' -f 4 | head -n1)
+       _dbuf=$(sudo grep -E 'username|DB_USER' app/etc/env.php | cut -d \' -f 4 | head -n1)
+       _dbpassf=$(sudo grep -E 'password|DB_PASSWORD' app/etc/env.php | cut -d \' -f 4 | head -n1)
+       _dbhostf=$(sudo grep -E 'host' app/etc/env.php | cut -d \' -f 4 | head -n1)
+    else
+       _dbf="$(sudo echo "cat /config/global/resources/default_setup/connection/dbname/text()" | sudo xmllint --nocdata --shell app/etc/"${_env}" | sudo sed '1d;$d')"
+       _dbuf="$(sudo echo "cat /config/global/resources/default_setup/connection/username/text()" | sudo xmllint --nocdata --shell app/etc/"${_env}" | sudo sed '1d;$d')"
+       _dbpassf="$(sudo echo "cat /config/global/resources/default_setup/connection/password/text()" | sudo xmllint --nocdata --shell app/etc/"${_env}" | sudo sed '1d;$d')"
+       _dbhostf="$(sudo echo "cat /config/global/resources/default_setup/connection/host/text()" | sudo xmllint --nocdata --shell app/etc/"${_env}" | sudo sed '1d;$d')"
+   fi
 }
 
 ###Dump source db###
@@ -196,8 +226,12 @@ _rsyncfilesinitial(){
 _rsyncfilesfinal(){
 
     echo -e "${_green}Starting Rsync..."
+    if [[ ${_cms} == "2" ]]; then
     sudo -u "${_usr}" rsync -e "ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -i ${_usrpath}/temp-MA.ed25519 -p${_port}" -aAXv --progress "${_susr}"@"${_host}":"${_appdocroot}"/pub/ ./pub/
     echo -e "${_nc}"
+    else
+    sudo -u "${_usr}" rsync -e "ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -i ${_usrpath}/temp-MA.ed25519 -p${_port}" -aAXv --progress "${_susr}"@"${_host}":"${_appdocroot}"/media/ ./media/
+   fi
 }
 
 
@@ -250,22 +284,22 @@ _getphp(){
 
 _configenv(){
 
-    echo -e "${_green}Updating env.php...${_nc}"
-    sudo -u "${_usr}" cp app/etc/env.php app/etc/env.php-MA-"${_date}"
-    sudo grep -il -RF "${_db}" app/etc/env.php | xargs -n1 sudo sed -i -r "s/${_db}/${_tdb}/g" 2> /dev/null
-    sudo grep -il -RF "${_dbu}" app/etc/env.php | xargs -n1 sudo sed -i -r "s/${_dbu}/${_tdb}/g" 2> /dev/null
-    sudo grep -il -RF "${_dbpass}" app/etc/env.php | xargs -n1 sudo sed -i -r "s/${_dbpass}/${_pass}/g" 2> /dev/null
-    sudo grep -il -RF "${_dbhost}" app/etc/env.php | xargs -n1 sudo sed -i -r "s/${_dbhost}/localhost/g" 2> /dev/null
+    echo -e "${_green}Updating ${_env}...${_nc}"
+    sudo -u "${_usr}" cp app/etc/"${_env}" app/etc/"${_env}"-MA-"${_date}"
+    sudo grep -il -RF "${_db}" app/etc/"${_env}" | xargs -n1 sudo sed -i -r "s/${_db}/${_tdb}/g" 2> /dev/null
+    sudo grep -il -RF "${_dbu}" app/etc/"${_env}" | xargs -n1 sudo sed -i -r "s/${_dbu}/${_tdb}/g" 2> /dev/null
+    sudo grep -il -RF "${_dbpass}" app/etc/"${_env}" | xargs -n1 sudo sed -i -r "s/${_dbpass}/${_pass}/g" 2> /dev/null
+    sudo grep -il -RF "${_dbhost}" app/etc/"${_env}" | xargs -n1 sudo sed -i -r "s/${_dbhost}/localhost/g" 2> /dev/null
 }
 
 _configenvf(){
 
-    echo -e "${_green}Updating env.php...${_nc}"
-    sudo -u "${_usr}" cp app/etc/env.php app/etc/env.php-MA-"${_date}"
-    sudo grep -il -RF "${_dbf}" app/etc/env.php | xargs -n1 sudo sed -i -r "s/${_dbf}/${_tdb}/g" 2> /dev/null
-    sudo grep -il -RF "${_dbuf}" app/etc/env.php | xargs -n1 sudo sed -i -r "s/${_dbuf}/${_tdb}/g" 2> /dev/null
-    sudo grep -il -RF "${_dbpassf}" app/etc/env.php | xargs -n1 sudo sed -i -r "s/${_dbpassf}/${_pass}/g" 2> /dev/null
-    sudo grep -il -RF "${_dbhostf}" app/etc/env.php | xargs -n1 sudo sed -i -r "s/${_dbhostf}/localhost/g" 2> /dev/null
+    echo -e "${_green}Updating ${_env}...${_nc}"
+    sudo -u "${_usr}" cp app/etc/"${_env}" app/etc/"${_env}"-MA-"${_date}"
+    sudo grep -il -RF "${_dbf}" app/etc/"${_env}" | xargs -n1 sudo sed -i -r "s/${_dbf}/${_tdb}/g" 2> /dev/null
+    sudo grep -il -RF "${_dbuf}" app/etc/"${_env}" | xargs -n1 sudo sed -i -r "s/${_dbuf}/${_tdb}/g" 2> /dev/null
+    sudo grep -il -RF "${_dbpassf}" app/etc/"${_env}" | xargs -n1 sudo sed -i -r "s/${_dbpassf}/${_pass}/g" 2> /dev/null
+    sudo grep -il -RF "${_dbhostf}" app/etc/"${_env}" | xargs -n1 sudo sed -i -r "s/${_dbhostf}/localhost/g" 2> /dev/null
 }
 
 _cleanup(){
@@ -310,13 +344,12 @@ _fullfinal(){
     _dschk;
     _testssh;
     _gatherinfo;
-    _gatherinfofinal;
     _rsyncfilesinitial;
     _dumpdb;
     _createdb;
     _importdb;
     _getphp;
-    _configenvf;
+    _configenv;
 
 }
 
