@@ -21,7 +21,7 @@ _usage() {
   cat <<- EOF
 
 msync version 1.0
-Description: Run initial and finial sync for Magento
+Description: Run initial and final sync for Magento
 
  Usage: msync [Option]
 
