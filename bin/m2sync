@@ -27,7 +27,7 @@ Description: Run initial and finial sync for Magento
 
          Supported options:
 
-          -f|--final       Run Final Sync (db + pub/ folder)
+          -f|--final       Run Final Sync [db + (pub or media) folder]
           -F|--fullfinal   Run final sync all
           -h|--help        Display this message
           -i|--initial     Run Initial Sync
