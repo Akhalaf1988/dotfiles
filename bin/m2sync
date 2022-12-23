@@ -306,7 +306,7 @@ _cleanup(){
    rm ~/"${_sqlfile}"
    sudo rm "${_usrpath}"/temp-MA.ed25519
    sudo rm "${_usrpath}"/temp-MA.ed25519.pub
-
+   sudo rm "${_usrpath}"/MA-dbinfo.txt
 }
 
 _initialsync(){
@@ -336,6 +336,7 @@ _finalsync(){
     _importdb;
     _getphp;
     _configenvf;
+    _cleanup;
 }
 
 _fullfinal(){
@@ -348,6 +349,7 @@ _fullfinal(){
     _importdb;
     _getphp;
     _configenv;
+    _cleanup;
 
 }
 
