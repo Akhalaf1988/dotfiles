@@ -45,7 +45,7 @@ _gethost (){
      case "${_host}" in
         "*" | "*.com" | "" | "*.*" | "*.org" | "*.net" | ".*" | "*.com.*")
         echo -e "${_red}Not an accepted Hostname${_nc}";
-        exit 0
+        exit 1
         ;;
         *)
         ;;
@@ -55,7 +55,7 @@ _gethost (){
     case "${_susr}" in
         "*" | "" | "/*" | "/home/*")
         echo -e "${_red}Not an accepted Username${_nc}";
-        exit 0
+        exit 1
         ;;
         *)
         ;;
@@ -70,7 +70,7 @@ _gethost (){
     case "${_appdocroot}" in
         "/" | "/var" | "/root" | "/home" | "/*" | "*" | "./*" | "")
         echo -e "${_red}Not an accepted path${_nc}";
-        exit 0
+        exit 1
         ;;
         *)
         ;;
@@ -87,7 +87,7 @@ _gethost (){
                 ;;
                 *)
                 echo -e "${_red}Not a supported version${_nc}"
-                exit 0
+                exit 1
                 ;;
          esac
 }
@@ -111,11 +111,11 @@ _dschk(){
         ;;
         "n" | "N" | "no"  | "NO" | "No")
         echo -e "${_green}Exiting${_nc}"
-        exit 0
+        exit 1
         ;;
         *)
          echo -e "${_red}Input required, exiting${_nc}"
-         exit 0
+         exit 1
         ;;
     esac
 }
@@ -130,7 +130,7 @@ _testssh (){
     fi
     if [ "${_lastcommand}" != 0 ]; then
         echo -e "${_red}ssh test failed\n${_nc}";
-        exit 0
+        exit 1
     fi
 }
 
@@ -157,7 +157,7 @@ _askkey(){
         ;;
         *)
             echo -e "${_red}Exiting Script${_nc}"
-            exit 0
+            exit 1
         ;;
     esac
 }
@@ -169,7 +169,7 @@ _gatherinfo(){
     sudo -u "${_usr}" ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${_usrpath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "stat ${_appdocroot}/app/etc/${_env}" > /dev/null
     _nlastcommand="$?";
     if [ "${_nlastcommand}" != 0 ]; then
-        exit 0
+        exit 1
     fi
     sudo -u "${_usr}" ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${_usrpath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "cat ${_appdocroot}/app/etc/${_env}" | sudo tee "${_usrpath}"/MA-dbinfo.txt > /dev/null
 
@@ -401,23 +401,18 @@ main () {
     case $OPTION in
       f)
         _finalsync;
-        exit 0;
         ;;
       F)
-        _fullfinal;
-        exit 0;
+        _initialsync;
         ;;
       h)
         _usage;
-        exit 0;
         ;;
       i)
        _initialsync
-       exit 0;
         ;;
       k)
        _createsshkey
-       exit 0;
         ;;
      "?")
         echo "-${OPTARG} is not a supported option." >&2
@@ -428,7 +423,7 @@ main () {
 }
     if [[ -z ${_domchk} ]]; then
     echo -e "${_red}Must be in a domain directory${_nc}"
-    exit 0
+    exit 1
     fi
 
 main;
