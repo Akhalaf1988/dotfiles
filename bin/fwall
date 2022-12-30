@@ -193,10 +193,10 @@ _gatherinfofinal(){
        _dbpassf=$(sudo grep -E 'password|DB_PASSWORD' app/etc/env.php | cut -d \' -f 4 | head -n1)
        _dbhostf=$(sudo grep -E 'host' app/etc/env.php | cut -d \' -f 4 | head -n1)
     else
-       _dbf="$(sudo echo "cat /config/global/resources/default_setup/connection/dbname/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
-       _dbuf="$(sudo echo "cat /config/global/resources/default_setup/connection/username/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
-       _dbpassf="$(sudo echo "cat /config/global/resources/default_setup/connection/password/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
-       _dbhostf="$(sudo echo "cat /config/global/resources/default_setup/connection/host/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
+       _dbf="$(echo "cat /config/global/resources/default_setup/connection/dbname/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
+       _dbuf="$(echo "cat /config/global/resources/default_setup/connection/username/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
+       _dbpassf="$(echo "cat /config/global/resources/default_setup/connection/password/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
+       _dbhostf="$(echo "cat /config/global/resources/default_setup/connection/host/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
    fi
 }
 
@@ -262,7 +262,7 @@ _createdb(){
 _importdb(){
 
     echo -e "${_green}Importing db.."
-    sudo importdb -U "${_usr}" -u "${_tdb}" -d "${_tdb}" -p "${_pass}" -f "${tempath}"/"${_sqlfile}" -y
+    importdb -U "${_usr}" -u "${_tdb}" -d "${_tdb}" -p "${_pass}" -f "${tempath}"/"${_sqlfile}" -y
     echo -e "${_nc}"
 }
 
@@ -306,7 +306,7 @@ _cleanup(){
 
    echo -e "${_green}Cleaning up...${_nc}"
    rm -r "${tempath}"
-   echo "${_red}Remember to remove the ssh pubkey from the portal!${_nc}"
+   echo -e "${_red}Remember to remove the ssh pubkey from the portal!${_nc}"
 }
 
 _initialsync(){
@@ -327,7 +327,8 @@ _initialsync(){
 _finalsync(){
 
     _dschk;
-    _testssh;
+    _createsshkey;
+    _askkey;
     _gatherinfo;
     _gatherinfofinal;
     _rsyncfilesfinal;
