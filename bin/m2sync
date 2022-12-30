@@ -20,19 +20,14 @@ tempath="$($_MKTEMP -d)"
 _usage() {
 
   cat <<- EOF
-
 msync version 1.0
 Description: Run initial and finial sync for Magento
-
  Usage: msync [Option]
-
          Supported options:
-
           -f|--final       Run Final Sync [db + (pub or media) folder]
           -h|--help        Display this message
           -i|--initial     Run Initial Sync
           -k|--key         Generate SSH Key
-
 EOF
 
 }
@@ -111,7 +106,7 @@ _dschk(){
         ;;
         "n" | "N" | "no"  | "NO" | "No")
         echo -e "${_green}Exiting${_nc}"
-        exit 1
+        exit 0
         ;;
         *)
          echo -e "${_red}Input required, exiting${_nc}"
@@ -145,7 +140,7 @@ _createsshkey ()
     else
       _sshkeypath="/home/${_susr}/.ssh/authorized_keys"
     fi
-    printf "\necho '${_catsshkeypub}' | sudo tee -a ${_sshkeypath} > /dev/null\n\n";
+    echo "${_catsshkeypub}";
 }
 
 _askkey(){
@@ -171,7 +166,7 @@ _gatherinfo(){
     if [ "${_nlastcommand}" != 0 ]; then
         exit 1
     fi
-    ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "cat ${_appdocroot}/app/etc/${_env}" | sudo tee "${tempath}"/MA-dbinfo.txt > /dev/null
+    ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "cat ${_appdocroot}/app/etc/${_env}" | tee "${tempath}"/MA-dbinfo.txt > /dev/null
 
     if [[ "${_cms}" == "2" ]]; then
        _db=$(grep -E 'dbname|DB_NAME' "${tempath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
@@ -193,10 +188,10 @@ _gatherinfofinal(){
        _dbpassf=$(sudo grep -E 'password|DB_PASSWORD' app/etc/env.php | cut -d \' -f 4 | head -n1)
        _dbhostf=$(sudo grep -E 'host' app/etc/env.php | cut -d \' -f 4 | head -n1)
     else
-       _dbf="$(sudo echo "cat /config/global/resources/default_setup/connection/dbname/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
-       _dbuf="$(sudo echo "cat /config/global/resources/default_setup/connection/username/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
-       _dbpassf="$(sudo echo "cat /config/global/resources/default_setup/connection/password/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
-       _dbhostf="$(sudo echo "cat /config/global/resources/default_setup/connection/host/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
+       _dbf="$(echo "cat /config/global/resources/default_setup/connection/dbname/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
+       _dbuf="$(echo "cat /config/global/resources/default_setup/connection/username/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
+       _dbpassf="$(echo "cat /config/global/resources/default_setup/connection/password/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
+       _dbhostf="$(echo "cat /config/global/resources/default_setup/connection/host/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
    fi
 }
 
@@ -262,7 +257,7 @@ _createdb(){
 _importdb(){
 
     echo -e "${_green}Importing db.."
-    sudo importdb -U "${_usr}" -u "${_tdb}" -d "${_tdb}" -p "${_pass}" -f "${tempath}"/"${_sqlfile}" -y
+    importdb -U "${_usr}" -u "${_tdb}" -d "${_tdb}" -p "${_pass}" -f "${tempath}"/"${_sqlfile}" -y
     echo -e "${_nc}"
 }
 
@@ -305,7 +300,8 @@ _configenvf(){
 _cleanup(){
 
    echo -e "${_green}Cleaning up...${_nc}"
-   rm r "${tempath}"
+   rm -r "${tempath}"
+   echo -e "${_red}Remember to remove the ssh pubkey from the portal!${_nc}"
 }
 
 _initialsync(){
@@ -320,13 +316,14 @@ _initialsync(){
     _importdb;
     _getphp;
     _configenv;
-
+    _cleanup
 }
 
 _finalsync(){
 
     _dschk;
-    _testssh;
+    _createsshkey;
+    _askkey;
     _gatherinfo;
     _gatherinfofinal;
     _rsyncfilesfinal;
@@ -336,6 +333,7 @@ _finalsync(){
     _getphp;
     _configenvf;
     _cleanup;
+
 }
 
 # Convert long command line options into short ones for getopts
@@ -383,19 +381,15 @@ main () {
     case $OPTION in
       f)
         _finalsync;
-        exit 0;
         ;;
       h)
         _usage;
-        exit 0;
         ;;
       i)
        _initialsync
-       exit 0;
         ;;
       k)
        _createsshkey
-       exit 0;
         ;;
      "?")
         echo "-${OPTARG} is not a supported option." >&2
