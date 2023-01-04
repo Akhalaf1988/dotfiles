@@ -300,8 +300,9 @@ _configenvf(){
 _cleanup(){
 
    echo -e "${_green}Cleaning up...${_nc}"
-   rm -r "${tempath}"
-   echo -e "${_red}Remember to remove the ssh pubkey from the portal!${_nc}"
+   rm -r ${tempath}
+   echo -e "${_red}Please note, at this time this script will move as is, you will need to check things such as \
+   Elastics-search (required on 2.4+), Varnish and Redis. Remember to remove the ssh pubkey from the portal!${_nc}"
 }
 
 _initialsync(){
