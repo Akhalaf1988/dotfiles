@@ -29,7 +29,6 @@ Description: Run initial and finial sync for Magento
          Supported options:
 
           -f|--final       Run Final Sync [db + (pub or media) folder]
-          -F|--fullfinal   Run final sync all
           -h|--help        Display this message
           -i|--initial     Run Initial Sync
           -k|--key         Generate SSH Key
@@ -46,7 +45,7 @@ _gethost (){
      case "${_host}" in
         "*" | "*.com" | "" | "*.*" | "*.org" | "*.net" | ".*" | "*.com.*")
         echo -e "${_red}Not an accepted Hostname${_nc}";
-        exit 0
+        exit 1
         ;;
         *)
         ;;
@@ -56,7 +55,7 @@ _gethost (){
     case "${_susr}" in
         "*" | "" | "/*" | "/home/*")
         echo -e "${_red}Not an accepted Username${_nc}";
-        exit 0
+        exit 1
         ;;
         *)
         ;;
@@ -71,7 +70,7 @@ _gethost (){
     case "${_appdocroot}" in
         "/" | "/var" | "/root" | "/home" | "/*" | "*" | "./*" | "")
         echo -e "${_red}Not an accepted path${_nc}";
-        exit 0
+        exit 1
         ;;
         *)
         ;;
@@ -88,7 +87,7 @@ _gethost (){
                 ;;
                 *)
                 echo -e "${_red}Not a supported version${_nc}"
-                exit 0
+                exit 1
                 ;;
          esac
 }
@@ -116,7 +115,7 @@ _dschk(){
         ;;
         *)
          echo -e "${_red}Input required, exiting${_nc}"
-         exit 0
+         exit 1
         ;;
     esac
 }
@@ -131,7 +130,7 @@ _testssh (){
     fi
     if [ "${_lastcommand}" != 0 ]; then
         echo -e "${_red}ssh test failed\n${_nc}";
-        exit 0
+        exit 1
     fi
 }
 
@@ -141,12 +140,8 @@ _createsshkey ()
     echo -e "${_green}Creating SSH key...${_nc}";
     ssh-keygen -q -t rsa -b 4096 -f "${tempath}"/temp-MA.ed25519 -C 'For NX-Migrations' -N '';
     _catsshkeypub=$(cat "${tempath}"/temp-MA.ed25519.pub);
-    if [[ ${_susr} == "root" || -z ${_susr} ]]; then
-      _sshkeypath="/root/.ssh/authorized_keys"
-    else
-      _sshkeypath="/home/${_susr}/.ssh/authorized_keys"
-    fi
-    sudo printf "\necho '${_catsshkeypub}' | sudo tee -a ${_sshkeypath} > /dev/null\n\n";
+    echo "${_catsshkeypub}";
+    echo "${tempath}"
 }
 
 _askkey(){
@@ -158,7 +153,7 @@ _askkey(){
         ;;
         *)
             echo -e "${_red}Exiting Script${_nc}"
-            exit 0
+            exit 1
         ;;
     esac
 }
@@ -170,15 +165,15 @@ _gatherinfo(){
     ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "stat ${_appdocroot}/app/etc/${_env}" > /dev/null
     _nlastcommand="$?";
     if [ "${_nlastcommand}" != 0 ]; then
-        exit 0
+        exit 1
     fi
-    ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "cat ${_appdocroot}/app/etc/${_env}" | sudo tee "${tempath}"/MA-dbinfo.txt > /dev/null
+    ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "cat ${_appdocroot}/app/etc/${_env}" | tee "${tempath}"/MA-dbinfo.txt > /dev/null
 
     if [[ "${_cms}" == "2" ]]; then
-       _db=$(sudo grep -E 'dbname|DB_NAME' "${tempath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
-       _dbu=$(sudo grep -E 'username|DB_USER' "${tempath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
-       _dbpass=$(sudo grep -E 'password|DB_PASSWORD' "${tempath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
-       _dbhost=$(sudo grep -E 'host' "${tempath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
+       _db=$(grep -E 'dbname|DB_NAME' "${tempath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
+       _dbu=$(grep -E 'username|DB_USER' "${tempath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
+       _dbpass=$(grep -E 'password|DB_PASSWORD' "${tempath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
+       _dbhost=$(grep -E 'host' "${tempath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
     else
        _db="$(echo "cat /config/global/resources/default_setup/connection/dbname/text()" | xmllint --nocdata --shell "${tempath}"/MA-dbinfo.txt | sed '1d;$d')"
        _dbu="$(echo "cat /config/global/resources/default_setup/connection/username/text()" | xmllint --nocdata --shell "${tempath}"/MA-dbinfo.txt | sed '1d;$d')"
@@ -194,10 +189,10 @@ _gatherinfofinal(){
        _dbpassf=$(sudo grep -E 'password|DB_PASSWORD' app/etc/env.php | cut -d \' -f 4 | head -n1)
        _dbhostf=$(sudo grep -E 'host' app/etc/env.php | cut -d \' -f 4 | head -n1)
     else
-       _dbf="$(sudo echo "cat /config/global/resources/default_setup/connection/dbname/text()" | sudo xmllint --nocdata --shell app/etc/"${_env}" | sudo sed '1d;$d')"
-       _dbuf="$(sudo echo "cat /config/global/resources/default_setup/connection/username/text()" | sudo xmllint --nocdata --shell app/etc/"${_env}" | sudo sed '1d;$d')"
-       _dbpassf="$(sudo echo "cat /config/global/resources/default_setup/connection/password/text()" | sudo xmllint --nocdata --shell app/etc/"${_env}" | sudo sed '1d;$d')"
-       _dbhostf="$(sudo echo "cat /config/global/resources/default_setup/connection/host/text()" | sudo xmllint --nocdata --shell app/etc/"${_env}" | sudo sed '1d;$d')"
+       _dbf="$(echo "cat /config/global/resources/default_setup/connection/dbname/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
+       _dbuf="$(echo "cat /config/global/resources/default_setup/connection/username/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
+       _dbpassf="$(echo "cat /config/global/resources/default_setup/connection/password/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
+       _dbhostf="$(echo "cat /config/global/resources/default_setup/connection/host/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
    fi
 }
 
@@ -218,6 +213,7 @@ _rsyncfilesinitial(){
 
     echo -e "${_green}Starting Rsync..."
     sudo rsync -e "ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -i ${tempath}/temp-MA.ed25519 -p${_port}" -aAXv --progress "${_susr}"@"${_host}":"${_appdocroot}"/ ./
+    sudo chown -R ${_usr}. ./
     echo -e "${_nc}"
 
 }
@@ -228,10 +224,12 @@ _rsyncfilesfinal(){
     echo -e "${_green}Starting Rsync..."
     if [[ ${_cms} == "2" ]]; then
     sudo rsync -e "ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -i ${tempath}/temp-MA.ed25519 -p${_port}" -aAXv --progress "${_susr}"@"${_host}":"${_appdocroot}"/pub/ ./pub/
+    sudo chown -R ${_usr}. ./
     echo -e "${_nc}"
     else
     sudo rsync -e "ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -i ${tempath}/temp-MA.ed25519 -p${_port}" -aAXv --progress "${_susr}"@"${_host}":"${_appdocroot}"/media/ ./media/
-   fi
+    sudo chown -R ${_usr}. ./
+    fi
 }
 
 
@@ -260,7 +258,7 @@ _createdb(){
 _importdb(){
 
     echo -e "${_green}Importing db.."
-    sudo importdb -U "${_usr}" -u "${_tdb}" -d "${_tdb}" -p "${_pass}" -f "${tempath}"/"${_sqlfile}" -y
+    importdb -U "${_usr}" -u "${_tdb}" -d "${_tdb}" -p "${_pass}" -f "${tempath}"/"${_sqlfile}" -y
     echo -e "${_nc}"
 }
 
@@ -273,7 +271,6 @@ _getphp(){
     _phpv=$(sudo grep source "${_usrpath}"/.bashrc | awk '{print $2}' | sed 's/enable/root\/usr\/bin\/php/g')
 
     if [[ "${_sourcephp}" != "${_targetphp}" ]]; then
-
        echo -e "${_red}Source and Target php versions do not match${_nc}"
        echo -e "${_green}Source php: ${_sourcephp}"
        echo -e "Target php: ${_targetphp}${_nc}"
@@ -285,29 +282,27 @@ _configenv(){
 
     echo -e "${_green}Updating ${_env}...${_nc}"
     sudo cp app/etc/"${_env}" app/etc/"${_env}"-MA-"${_date}"
-    sudo grep -il -RF "${_db}" app/etc/"${_env}" | xargs -n1 sudo sed -i -r "s/${_db}/${_tdb}/g" 2> /dev/null
-    sudo grep -il -RF "${_dbu}" app/etc/"${_env}" | xargs -n1 sudo sed -i -r "s/${_dbu}/${_tdb}/g" 2> /dev/null
-    sudo grep -il -RF "${_dbpass}" app/etc/"${_env}" | xargs -n1 sudo sed -i -r "s/${_dbpass}/${_pass}/g" 2> /dev/null
-    sudo grep -il -RF "${_dbhost}" app/etc/"${_env}" | xargs -n1 sudo sed -i -r "s/${_dbhost}/localhost/g" 2> /dev/null
+    sudo grep -il -RF "${_db}" app/etc/"${_env}" | xargs -n1 sudo -u ${_usr} sed -i -r "s/${_db}/${_tdb}/g" 2> /dev/null
+    sudo grep -il -RF "${_dbu}" app/etc/"${_env}" | xargs -n1 sudo -u ${_usr} sed -i -r "s/${_dbu}/${_tdb}/g" 2> /dev/null
+    sudo grep -il -RF "${_dbpass}" app/etc/"${_env}" | xargs -n1 sudo -u ${_usr} sed -i -r "s/${_dbpass}/${_pass}/g" 2> /dev/null
+    sudo grep -il -RF "${_dbhost}" app/etc/"${_env}" | xargs -n1 sudo -u ${_usr} sed -i -r "s/${_dbhost}/localhost/g" 2> /dev/null
 }
 
 _configenvf(){
 
     echo -e "${_green}Updating ${_env}...${_nc}"
     sudo cp app/etc/"${_env}" app/etc/"${_env}"-MA-"${_date}"
-    sudo grep -il -RF "${_dbf}" app/etc/"${_env}" | xargs -n1 sudo sed -i -r "s/${_dbf}/${_tdb}/g" 2> /dev/null
-    sudo grep -il -RF "${_dbuf}" app/etc/"${_env}" | xargs -n1 sudo sed -i -r "s/${_dbuf}/${_tdb}/g" 2> /dev/null
-    sudo grep -il -RF "${_dbpassf}" app/etc/"${_env}" | xargs -n1 sudo sed -i -r "s/${_dbpassf}/${_pass}/g" 2> /dev/null
-    sudo grep -il -RF "${_dbhostf}" app/etc/"${_env}" | xargs -n1 sudo sed -i -r "s/${_dbhostf}/localhost/g" 2> /dev/null
+    sudo grep -il -RF "${_dbf}" app/etc/"${_env}" | xargs -n1 sudo -u ${_usr} sed -i -r "s/${_dbf}/${_tdb}/g" 2> /dev/null
+    sudo grep -il -RF "${_dbuf}" app/etc/"${_env}" | xargs -n1 sudo -u ${_usr} sed -i -r "s/${_dbuf}/${_tdb}/g" 2> /dev/null
+    sudo grep -il -RF "${_dbpassf}" app/etc/"${_env}" | xargs -n1 sudo -u ${_usr} sed -i -r "s/${_dbpassf}/${_pass}/g" 2> /dev/null
+    sudo grep -il -RF "${_dbhostf}" app/etc/"${_env}" | xargs -n1 sudo -u ${_usr} sed -i -r "s/${_dbhostf}/localhost/g" 2> /dev/null
 }
 
 _cleanup(){
 
    echo -e "${_green}Cleaning up...${_nc}"
-   rm "${tempath}"/"${_sqlfile}"
-   sudo rm "${tempath}"/temp-MA.ed25519
-   sudo rm "${tempath}"/temp-MA.ed25519.pub
-   sudo rm "${tempath}"/MA-dbinfo.txt
+   rm -r ${tempath}
+   echo -e "${_red}Things to check for, redis, elasticsearch, varnish. Remember to remove the ssh pub-key from portal${_nc}"
 }
 
 _initialsync(){
@@ -322,13 +317,14 @@ _initialsync(){
     _importdb;
     _getphp;
     _configenv;
-
+    _cleanup
 }
 
 _finalsync(){
 
     _dschk;
-    _testssh;
+    _createsshkey;
+    _askkey;
     _gatherinfo;
     _gatherinfofinal;
     _rsyncfilesfinal;
@@ -338,19 +334,7 @@ _finalsync(){
     _getphp;
     _configenvf;
     _cleanup;
-}
 
-_fullfinal(){
-    _dschk;
-    _testssh;
-    _gatherinfo;
-    _rsyncfilesinitial;
-    _dumpdb;
-    _createdb;
-    _importdb;
-    _getphp;
-    _configenv;
-    _cleanup;
 }
 
 # Convert long command line options into short ones for getopts
@@ -363,9 +347,6 @@ _cmdline() {
     case "$x" in
       "--final"|"-f")
         args="${args}-f "
-        ;;
-      "--fullfinal"|"-F")
-        args="${args}-F "
         ;;
       "--help"|"-h")
         args="${args}-h "
@@ -396,28 +377,20 @@ main () {
 
   mapfile -t cmdline < <(_cmdline | tr ' ' '\n');
 
-  while getopts ":fFhik" OPTION "${cmdline[@]}"; do
+  while getopts ":fhik" OPTION "${cmdline[@]}"; do
 
     case $OPTION in
       f)
         _finalsync;
-        exit 0;
-        ;;
-      F)
-        _fullfinal;
-        exit 0;
         ;;
       h)
         _usage;
-        exit 0;
         ;;
       i)
        _initialsync
-       exit 0;
         ;;
       k)
        _createsshkey
-       exit 0;
         ;;
      "?")
         echo "-${OPTARG} is not a supported option." >&2
@@ -428,7 +401,7 @@ main () {
 }
     if [[ -z ${_domchk} ]]; then
     echo -e "${_red}Must be in a domain directory${_nc}"
-    exit 0
+    exit 1
     fi
 
 main;
