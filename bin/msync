@@ -51,7 +51,7 @@ _gethost (){
         ;;
       esac
  #get username#
-    read -r -p "${_cyan}User: ${_nc}" _susr;
+    read -r -p "${_cyan}SSH User: ${_nc}" _susr;
     case "${_susr}" in
         "*" | "" | "/*" | "/home/*")
         echo -e "${_red}Not an accepted Username${_nc}";
