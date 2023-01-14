@@ -20,26 +20,21 @@ tempath="$($_MKTEMP -d)"
 _usage() {
 
   cat <<- EOF
-
 msync version 1.0
 Description: Run initial and finial sync for Magento
-
  Usage: msync [Option]
-
          Supported options:
-
           -f|--final       Run Final Sync [db + (pub or media) folder]
           -h|--help        Display this message
           -i|--initial     Run Initial Sync
           -k|--key         Generate SSH Key
-
 EOF
 
 }
 
 _gethost (){
  #get hostname#
-    echo "";
+    _sdate=$(date "+%A %B %d %T %y")
     echo -e "${_blue}###### Source Info ######";
     read -r -p "${_cyan}Host: ${_nc}" _host;
      case "${_host}" in
@@ -141,7 +136,8 @@ _createsshkey ()
     ssh-keygen -q -t rsa -b 4096 -f "${tempath}"/temp-MA.ed25519 -C 'For NX-Migrations' -N '';
     _catsshkeypub=$(cat "${tempath}"/temp-MA.ed25519.pub);
     echo "${_catsshkeypub}";
-    echo "${tempath}"
+    echo ""
+    echo "Key was created in this location: ${tempath}"
 }
 
 _askkey(){
@@ -270,12 +266,6 @@ _getphp(){
     _targetphp=$(sudo grep source "${_usrpath}"/.bashrc | cut -d"/" -f4 | sed -r 's/php|u//g')
     _phpv=$(sudo grep source "${_usrpath}"/.bashrc | awk '{print $2}' | sed 's/enable/root\/usr\/bin\/php/g')
 
-    if [[ "${_sourcephp}" != "${_targetphp}" ]]; then
-       echo -e "${_red}Source and Target php versions do not match${_nc}"
-       echo -e "${_green}Source php: ${_sourcephp}"
-       echo -e "Target php: ${_targetphp}${_nc}"
-    fi
-
 }
 
 _configenv(){
@@ -302,7 +292,32 @@ _cleanup(){
 
    echo -e "${_green}Cleaning up...${_nc}"
    rm -r ${tempath}
-   echo -e "${_red}Things to check for, redis, elasticsearch, varnish. Remember to remove the ssh pub-key from portal${_nc}"
+}
+##ending info to add in a ticket##
+_pinnednote(){
+    echo "${_cyan}Msync Start: ${_sdate}"
+    _edate=$(date "+%A %B %d %T %y")
+    echo "${_cyan}Msync Finish: ${_edate}"
+    echo "Source Host: ${_host}"
+    echo "Source path: ${_appdocroot}"
+    echo "CMS Version: ${_CMSVERSON}"
+    echo "Disk space info on Target"
+    df -h | grep -E 'File|/$|chroot'
+    echo;
+    printf "%8s %12s %14s %14s" "Username" "Used(%)" "Used(G)" "Total(G)";
+    printf "\n%-10s" "${_usr}";
+    sudo quota -g "${_usr}" 2> /dev/null | tail -1 | awk '{printf "%10.3f%%  %10.3f GB  %10.3f GB",($2/$3*100),($2/1000/1024),($3/1000/1024)}' 2> /dev/null
+    echo ""
+    echo -e "${_red}Things to check for"
+    echo "-------------------"
+    if [[ "${_sourcephp}" != "${_targetphp}" ]]; then
+       echo "Source and Target php versions do not match"
+       echo "Source php: ${_sourcephp}"
+       echo "Target php: ${_targetphp}"
+    fi
+    echo "Check for Redis, Elastic-Search and Varnish
+Remove the ssh pub-key"
+    echo -e "${_nc}"
 }
 
 _initialsync(){
@@ -317,7 +332,8 @@ _initialsync(){
     _importdb;
     _getphp;
     _configenv;
-    _cleanup
+    _cleanup;
+    _pinnednote;
 }
 
 _finalsync(){
@@ -334,6 +350,7 @@ _finalsync(){
     _getphp;
     _configenvf;
     _cleanup;
+    _pinnednote;
 
 }
 
