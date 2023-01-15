@@ -157,8 +157,8 @@ _askkey(){
     esac
 }
 
-#garther info from config file and calculate size of rsync
-_gatherinfo(){
+#stat the config file and exit if it doesnt exist, grab it if it does.
+_stat_n_cat(){
     echo -e "${_green}Gathering Info..."
     ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "stat ${_appdocroot}/app/etc/${_env}" > /dev/null
     _nlastcommand="$?";
@@ -166,6 +166,10 @@ _gatherinfo(){
         exit 1
     fi
     ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "cat ${_appdocroot}/app/etc/${_env}" | tee "${tempath}"/MA-dbinfo.txt > /dev/null
+}
+
+#gather info from config file
+_gatherinfo(){
     if [[ "${_cms}" == "2" ]]; then
        _db=$(grep -E 'dbname|DB_NAME' "${tempath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
        _dbu=$(grep -E 'username|DB_USER' "${tempath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
@@ -178,6 +182,7 @@ _gatherinfo(){
        _dbhost="$(echo "cat /config/global/resources/default_setup/connection/host/text()" | xmllint --nocdata --shell "${tempath}"/MA-dbinfo.txt | sed '1d;$d')"
     fi
 }
+
 #all info in initial is in that temp dir, on final we need to swap what is currently in the local.xml or env.php
 _gatherinfofinal(){
     if [[ "${_cms}" == "2" ]]; then
@@ -185,7 +190,6 @@ _gatherinfofinal(){
        _dbuf=$(sudo grep -E 'username|DB_USER' app/etc/env.php | cut -d \' -f 4 | head -n1)
        _dbpassf=$(sudo grep -E 'password|DB_PASSWORD' app/etc/env.php | cut -d \' -f 4 | head -n1)
        _dbhostf=$(sudo grep -E 'host' app/etc/env.php | cut -d \' -f 4 | head -n1)
-
     else
        _dbf="$(echo "cat /config/global/resources/default_setup/connection/dbname/text()" | sudo -u "${_usr}" xmllint --nocdata --shell app/etc/"${_env}" | sudo -u "${_usr}" sed '1d;$d')"
        _dbuf="$(echo "cat /config/global/resources/default_setup/connection/username/text()" | sudo -u "${_usr}" xmllint --nocdata --shell app/etc/"${_env}" | sudo -u "${_usr}" sed '1d;$d')"
@@ -194,7 +198,7 @@ _gatherinfofinal(){
    fi
 }
 _calculate_rsync_initial(){
-    echo "Calculating Size. Please wait..."
+    echo "Calculating size. Please wait..."
     _rsync_size=$(ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "find ${_appdocroot} 2> /dev/null | wc -l")
 }
 
@@ -293,14 +297,6 @@ _configenvf(){
     sudo grep -il -RF "${_dbhostf}" app/etc/"${_env}" | xargs -n1 sudo -u "${_usr}" sed -i -r "s/${_dbhostf}/localhost/g" 2> /dev/null
 }
 
-#remove the temp directory created at start
-_cleanup(){
-
-   printf "\n${_green}%sCleaning up..."
-   rm -r "${tempath}"
-   printf "Done%s\n${_nc}"
-}
-
 #ending info to add in a ticket
 _pinnednote(){
     echo "${_cyan}Msync Start: ${_sdate}"
@@ -315,7 +311,7 @@ _pinnednote(){
     printf "%8s %12s %14s %14s" "Username" "Used(%)" "Used(G)" "Total(G)";
     printf "\n%-10s" "${_usr}";
     sudo quota -g "${_usr}" 2> /dev/null | tail -1 | awk '{printf "%10.3f%%  %10.3f GB  %10.3f GB",($2/$3*100),($2/1000/1024),($3/1000/1024)}' 2> /dev/null
-    echo ""
+    echo;
     echo -e "${_red}Things to check for"
     echo "-------------------"
     if [[ "${_sourcephp}" != "${_targetphp}" ]]; then
@@ -325,6 +321,7 @@ _pinnednote(){
     fi
     echo -e "Redis, Elastic-Search and Varnish
 Remove the ssh pub-key${_nc}"
+
 }
 
 #run functions for initial in this order
@@ -333,6 +330,7 @@ _initialsync(){
     _dschk;
     _createsshkey;
     _askkey;
+    _stat_n_cat;
     _gatherinfo;
     _calculate_rsync_initial;
     _rsyncfilesinitial;
@@ -342,13 +340,15 @@ _initialsync(){
     _getphp;
     _configenv;
     _pinnednote;
+
 }
-#run functions for final in this order
+#run functions in this order
 _finalsync(){
 
     _dschk;
     _createsshkey;
     _askkey;
+    _stat_n_cat;
     _gatherinfo;
     _gatherinfofinal;
     _calculate_rsync_final;
@@ -424,9 +424,20 @@ main () {
     esac
   done
 }
+
+#remove the temp directory created at start
+_cleanup(){
+
+   printf "\n${_green}%sCleaning up..."
+   rm -r "${tempath}"
+   printf "Done%s\n${_nc}"
+}
+
     if [[ -z ${_domchk} ]]; then
-    echo -e "${_red}Must be in a domain directory${_nc}"
-    exit 1
+       echo -e "${_red}Must be in a domain directory${_nc}"
+       exit 1
     fi
-    trap "_cleanup" EXIT
+    if [[ "$1" != "-k" ]]; then
+       trap "_cleanup" EXIT
+    fi
 main;
