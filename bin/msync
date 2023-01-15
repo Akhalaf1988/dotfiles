@@ -187,10 +187,10 @@ _gatherinfofinal(){
        _dbhostf=$(sudo grep -E 'host' app/etc/env.php | cut -d \' -f 4 | head -n1)
 
     else
-       _dbf="$(echo "cat /config/global/resources/default_setup/connection/dbname/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u "${_usr}" sed '1d;$d')"
-       _dbuf="$(echo "cat /config/global/resources/default_setup/connection/username/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u "${_usr}" sed '1d;$d')"
-       _dbpassf="$(echo "cat /config/global/resources/default_setup/connection/password/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u "${_usr}" sed '1d;$d')"
-       _dbhostf="$(echo "cat /config/global/resources/default_setup/connection/host/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u "${_usr}" sed '1d;$d')"
+       _dbf="$(echo "cat /config/global/resources/default_setup/connection/dbname/text()" | sudo -u "${_usr}" xmllint --nocdata --shell app/etc/"${_env}" | sudo -u "${_usr}" sed '1d;$d')"
+       _dbuf="$(echo "cat /config/global/resources/default_setup/connection/username/text()" | sudo -u "${_usr}" xmllint --nocdata --shell app/etc/"${_env}" | sudo -u "${_usr}" sed '1d;$d')"
+       _dbpassf="$(echo "cat /config/global/resources/default_setup/connection/password/text()" | sudo -u "${_usr}" xmllint --nocdata --shell app/etc/"${_env}" | sudo -u "${_usr}" sed '1d;$d')"
+       _dbhostf="$(echo "cat /config/global/resources/default_setup/connection/host/text()" | sudo -u "${_usr}" xmllint --nocdata --shell app/etc/"${_env}" | sudo -u "${_usr}" sed '1d;$d')"
    fi
 }
 _calculate_rsync_initial(){
@@ -295,7 +295,7 @@ _configenvf(){
 _cleanup(){
 
    echo -e "${_green}Cleaning up...${_nc}"
-   rm -r ${tempath}
+   rm -r "${tempath}"
 }
 #ending info to add in a ticket
 _pinnednote(){
