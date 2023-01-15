@@ -31,7 +31,7 @@ Description: Run initial and finial sync for Magento
 EOF
 
 }
-
+ #get hostname
 _gethost (){
  #get hostname#
     _sdate=$(date "+%A %B %d %T %y")
@@ -45,7 +45,7 @@ _gethost (){
         *)
         ;;
       esac
- #get username#
+ #get username
     read -r -p "${_cyan}SSH User: ${_nc}" _susr;
     case "${_susr}" in
         "*" | "" | "/*" | "/home/*")
@@ -55,12 +55,12 @@ _gethost (){
         *)
         ;;
     esac
- #get port#
+ #get port
     read -r -p "${_cyan}Port: ${_nc}" _port;
     if [[ -z ${_port} ]]; then
         _port='22';
     fi;
- #get docroot#
+ #get path to main install
     read -r -p "${_cyan}Path To Sitefiles: ${_nc}" _appdocroot;
     case "${_appdocroot}" in
         "/" | "/var" | "/root" | "/home" | "/*" | "*" | "./*" | "")
@@ -70,15 +70,18 @@ _gethost (){
         *)
         ;;
     esac
+#get CMS version
         read -r -p "${_cyan}Pick CMS Version (1/2): ${_nc}" _CMSVERSON;
         case $_CMSVERSON in
                 1)
                 _cms='1'
                 _env="local.xml"
+                _pub_media="media"
                 ;;
                 2)
                 _cms='2'
                 _env="env.php"
+                _pub_media="pub"
                 ;;
                 *)
                 echo -e "${_red}Not a supported version${_nc}"
@@ -91,7 +94,6 @@ _gethost (){
 #check diskspace on local#
 _dschk(){
    echo -e "${_green}Checking local Disk Space..."
-   echo;
    echo;
    df -h | grep -E 'File|/$|chroot'
    echo;
@@ -115,12 +117,12 @@ _dschk(){
     esac
 }
 
-#test ssh connection#
+#test ssh connection
 _testssh (){
 
     if [[ -e ${tempath}/temp-MA.ed25519 ]]; then
-       echo -e "${_green}Testing ssh connecting..${_nc}";
-       ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "echo -e '${_green}ssh connection successful\n${_nc}'" 2> /dev/null;
+       echo -e "${_green}Testing ssh connecting...${_nc}";
+       ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "echo -e '${_green}ssh connection successful${_nc}'" 2> /dev/null;
        _lastcommand="$?";
     fi
     if [ "${_lastcommand}" != 0 ]; then
@@ -129,7 +131,7 @@ _testssh (){
     fi
 }
 
-##create ssh key#
+##create ssh key
 _createsshkey ()
 {
     echo -e "${_green}Creating SSH key...${_nc}";
@@ -140,6 +142,7 @@ _createsshkey ()
     echo "Key was created in this location: ${tempath}"
 }
 
+#ask if key is installed
 _askkey(){
 
     read -r -p "${_cyan}Key installed?: ${_nc}" _key;
@@ -154,9 +157,8 @@ _askkey(){
     esac
 }
 
-
+#garther info from config file and calculate size of rsync
 _gatherinfo(){
-   ###Set variables and such###
     echo -e "${_green}Gathering Info..."
     ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "stat ${_appdocroot}/app/etc/${_env}" > /dev/null
     _nlastcommand="$?";
@@ -164,9 +166,6 @@ _gatherinfo(){
         exit 1
     fi
     ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "cat ${_appdocroot}/app/etc/${_env}" | tee "${tempath}"/MA-dbinfo.txt > /dev/null
-    echo "Calculating Size..."
-    _rsync_size=$(ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "find ${_appdocroot} 2> /dev/null | wc -l")
-
     if [[ "${_cms}" == "2" ]]; then
        _db=$(grep -E 'dbname|DB_NAME' "${tempath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
        _dbu=$(grep -E 'username|DB_USER' "${tempath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
@@ -179,7 +178,7 @@ _gatherinfo(){
        _dbhost="$(echo "cat /config/global/resources/default_setup/connection/host/text()" | xmllint --nocdata --shell "${tempath}"/MA-dbinfo.txt | sed '1d;$d')"
     fi
 }
-
+#all info in initial is in that temp dir, on final we need to swap what is currently in the local.xml or env.php
 _gatherinfofinal(){
     if [[ "${_cms}" == "2" ]]; then
        _dbf=$(sudo grep -E 'dbname|DB_NAME' app/etc/env.php | cut -d \' -f 4 | head -n1)
@@ -194,8 +193,17 @@ _gatherinfofinal(){
        _dbhostf="$(echo "cat /config/global/resources/default_setup/connection/host/text()" | sudo -u ${_usr} xmllint --nocdata --shell app/etc/"${_env}" | sudo -u ${_usr} sed '1d;$d')"
    fi
 }
+_calculate_rsync_initial(){
+    echo "Calculating Size. Please wait..."
+    _rsync_size=$(ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "find ${_appdocroot} 2> /dev/null | wc -l")
+}
 
-###Dump source db###
+_calculate_rsync_final(){
+    echo "Calculating Size. Please wait..."
+    _rsync_size_final=$(ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "find ${_appdocroot}/"${_pub_media}" 2> /dev/null | wc -l")
+}
+
+#Dump source db and put it in a tmp folder.
 _dumpdb(){
 
     echo -e "${_green}Dumping source db..."
@@ -207,7 +215,7 @@ _dumpdb(){
 }
 
 
-####Rsync initial###
+#Rsync initial
 _rsyncfilesinitial(){
 
     echo -e "${_green}Starting Rsync..."
@@ -217,22 +225,17 @@ _rsyncfilesinitial(){
 
 }
 
-#rsync final#
+#Rsync final and chown
 _rsyncfilesfinal(){
 
     echo -e "${_green}Starting Rsync..."
-    if [[ ${_cms} == "2" ]]; then
-    sudo rsync -e "ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -i ${tempath}/temp-MA.ed25519 -p${_port}" -aAXv --progress "${_susr}"@"${_host}":"${_appdocroot}"/pub/ ./pub/
+    sudo rsync -e "ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -i ${tempath}/temp-MA.ed25519 -p${_port}" -vrltD --stats --human-readable "${_susr}"@"${_host}":"${_appdocroot}"/"${_pub_media}"/ ./"${_pub_media}"/ | pv -lep -s ${_rsync_size_final} >/dev/null
     sudo chown -R ${_usr}. ./
     echo -e "${_nc}"
-    else
-    sudo rsync -e "ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -i ${tempath}/temp-MA.ed25519 -p${_port}" -aAXv --progress "${_susr}"@"${_host}":"${_appdocroot}"/media/ ./media/
-    sudo chown -R ${_usr}. ./
-    fi
 }
 
 
-###Create db###
+#Create db
 _createdb(){
 
     echo -e "${_green}Creating database...${_nc}"
@@ -248,20 +251,18 @@ _createdb(){
     _pass="$(echo "${_W1}${_W2}${_W3}${_N}" | sed "s/'//g")"
     _Ramdom_num="$(shuf -i 111111-999999 -n 1)"
     _tdb="${_usr}_${_Ramdom_num}"
-    _createdbnuser="$(sudo siteworx -u --login_domain="${_dom}" -n -c MysqlDb -a add --name "${_Ramdom_num}" --create_user 1 --user "${_Ramdom_num}" --password "${_pass}" --confirm_password "${_pass}" --host %;)"
-    echo -e "${_green}${_createdbnuser}"
-
+    sudo siteworx -u --login_domain="${_dom}" -n -c MysqlDb -a add --name "${_Ramdom_num}" --create_user 1 --user "${_Ramdom_num}" --password "${_pass}" --confirm_password "${_pass}" --host %;
 }
 
-#importdb#
+#importdb using matt R tool
 _importdb(){
 
-    echo -e "${_green}Importing db.."
+    echo -e "${_green}Importing db..."
     importdb -U "${_usr}" -u "${_tdb}" -d "${_tdb}" -p "${_pass}" -f "${tempath}"/"${_sqlfile}" -y
     echo -e "${_nc}"
 }
 
-#check php version#
+#check php version on source and target to compare at the end in pinned note
 _getphp(){
 
     echo -e "${_green}Checking PHP Version..."
@@ -270,7 +271,7 @@ _getphp(){
     _phpv=$(sudo grep source "${_usrpath}"/.bashrc | awk '{print $2}' | sed 's/enable/root\/usr\/bin\/php/g')
 
 }
-
+#search replace db, user and host in config file
 _configenv(){
 
     echo -e "${_green}Updating ${_env}...${_nc}"
@@ -280,7 +281,7 @@ _configenv(){
     sudo grep -il -RF "${_dbpass}" app/etc/"${_env}" | xargs -n1 sudo -u ${_usr} sed -i -r "s/${_dbpass}/${_pass}/g" 2> /dev/null
     sudo grep -il -RF "${_dbhost}" app/etc/"${_env}" | xargs -n1 sudo -u ${_usr} sed -i -r "s/${_dbhost}/localhost/g" 2> /dev/null
 }
-
+#search replace db, user and host in config file
 _configenvf(){
 
     echo -e "${_green}Updating ${_env}...${_nc}"
@@ -290,13 +291,13 @@ _configenvf(){
     sudo grep -il -RF "${_dbpassf}" app/etc/"${_env}" | xargs -n1 sudo -u ${_usr} sed -i -r "s/${_dbpassf}/${_pass}/g" 2> /dev/null
     sudo grep -il -RF "${_dbhostf}" app/etc/"${_env}" | xargs -n1 sudo -u ${_usr} sed -i -r "s/${_dbhostf}/localhost/g" 2> /dev/null
 }
-
+#remove the temp directory created at start
 _cleanup(){
 
    echo -e "${_green}Cleaning up...${_nc}"
    rm -r ${tempath}
 }
-##ending info to add in a ticket##
+#ending info to add in a ticket
 _pinnednote(){
     echo "${_cyan}Msync Start: ${_sdate}"
     _edate=$(date "+%A %B %d %T %y")
@@ -314,21 +315,22 @@ _pinnednote(){
     echo -e "${_red}Things to check for"
     echo "-------------------"
     if [[ "${_sourcephp}" != "${_targetphp}" ]]; then
-       echo "Source and Target php versions do not match"
+       echo "Source and Target php versions do not match!"
        echo "Source php: ${_sourcephp}"
        echo "Target php: ${_targetphp}"
     fi
-    echo "Check for Redis, Elastic-Search and Varnish
+    echo "Redis, Elastic-Search and Varnish
 Remove the ssh pub-key"
     echo -e "${_nc}"
 }
-
+#run functions in this order
 _initialsync(){
 
     _dschk;
     _createsshkey;
     _askkey;
     _gatherinfo;
+    _calculate_rsync_initial;
     _rsyncfilesinitial;
     _dumpdb;
     _createdb;
@@ -338,7 +340,7 @@ _initialsync(){
     _cleanup;
     _pinnednote;
 }
-
+#run functions in this order
 _finalsync(){
 
     _dschk;
@@ -346,6 +348,7 @@ _finalsync(){
     _askkey;
     _gatherinfo;
     _gatherinfofinal;
+    _calculate_rsync_final;
     _rsyncfilesfinal;
     _dumpdb;
     _createdb;
