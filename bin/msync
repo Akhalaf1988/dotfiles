@@ -281,6 +281,7 @@ _configenv(){
     sudo grep -il -RF "${_dbpass}" app/etc/"${_env}" | xargs -n1 sudo -u "${_usr}" sed -i -r "s/${_dbpass}/${_pass}/g" 2> /dev/null
     sudo grep -il -RF "${_dbhost}" app/etc/"${_env}" | xargs -n1 sudo -u "${_usr}" sed -i -r "s/${_dbhost}/localhost/g" 2> /dev/null
 }
+
 #search replace db, user and host in config file
 _configenvf(){
 
@@ -291,12 +292,15 @@ _configenvf(){
     sudo grep -il -RF "${_dbpassf}" app/etc/"${_env}" | xargs -n1 sudo -u "${_usr}" sed -i -r "s/${_dbpassf}/${_pass}/g" 2> /dev/null
     sudo grep -il -RF "${_dbhostf}" app/etc/"${_env}" | xargs -n1 sudo -u "${_usr}" sed -i -r "s/${_dbhostf}/localhost/g" 2> /dev/null
 }
+
 #remove the temp directory created at start
 _cleanup(){
 
-   echo -e "${_green}Cleaning up...${_nc}"
+   printf "\n${_green}%sCleaning up..."
    rm -r "${tempath}"
+   printf "Done%s\n${_nc}"
 }
+
 #ending info to add in a ticket
 _pinnednote(){
     echo "${_cyan}Msync Start: ${_sdate}"
@@ -319,11 +323,11 @@ _pinnednote(){
        echo "Source php: ${_sourcephp}"
        echo "Target php: ${_targetphp}"
     fi
-    echo "Redis, Elastic-Search and Varnish
-Remove the ssh pub-key"
-    echo -e "${_nc}"
+    echo -e "Redis, Elastic-Search and Varnish
+Remove the ssh pub-key${_nc}"
 }
-#run functions in this order
+
+#run functions for initial in this order
 _initialsync(){
 
     _dschk;
@@ -337,10 +341,9 @@ _initialsync(){
     _importdb;
     _getphp;
     _configenv;
-    _cleanup;
     _pinnednote;
 }
-#run functions in this order
+#run functions for final in this order
 _finalsync(){
 
     _dschk;
@@ -355,7 +358,6 @@ _finalsync(){
     _importdb;
     _getphp;
     _configenvf;
-    _cleanup;
     _pinnednote;
 
 }
@@ -426,5 +428,5 @@ main () {
     echo -e "${_red}Must be in a domain directory${_nc}"
     exit 1
     fi
-
+    trap "_cleanup" EXIT
 main;
