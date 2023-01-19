@@ -1,5 +1,4 @@
 #! /usr/bin/env bash
-###Created by Abe k for MA to MA migrations##
 # Script Arguments
 readonly ARGA=("$@")
 readonly _MKTEMP="/bin/mktemp"
@@ -22,7 +21,8 @@ _usage() {
 msync version 1.0
 Description: Run initial and finial sync for Magento
  Usage: msync [Option]
-         Supported options:
+ 
+         Supported Options:
           -f|--final       Run Final Sync [db + (pub or media) folder]
           -h|--help        Display this message
           -i|--initial     Run Initial Sync
@@ -30,6 +30,7 @@ Description: Run initial and finial sync for Magento
 EOF
 
 }
+
  #get hostname
 _gethost (){
  #get hostname#
