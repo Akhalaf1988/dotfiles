@@ -14,7 +14,6 @@ _usr="$(pwd | grep --color=auto -Po "/(chroot/)?home/\K[^/]*")";
 _usrpath="/home/${_usr}";
 _dom="$(pwd| grep --color=auto -Po "/(chroot/)?home/${_usr}/\K[^/]*")";
 _domchk=$(find /etc/httpd/conf.d/ -type f -iname "vhost_${_dom}.conf")
-tempath="$($_MKTEMP -d)"
 
 # Print usage
 _usage() {
@@ -93,7 +92,7 @@ _gethost (){
 
 #check diskspace on local#
 _dschk(){
-   echo -e "${_green}Checking local Disk Space..."
+   printf "%s${_green}Checking local Disk Space..."
    echo;
    df -h | grep -E 'File|/$|chroot'
    echo;
@@ -122,7 +121,7 @@ _testssh (){
 
     if [[ -e ${tempath}/temp-MA.ed25519 ]]; then
        echo -e "${_green}Testing ssh connecting...${_nc}";
-       ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "echo -e '${_green}ssh connection successful${_nc}'" 2> /dev/null;
+       ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "printf '%s${_green}ssh connection successful\n${_nc}'" 2> /dev/null;
        _lastcommand="$?";
     fi
     if [ "${_lastcommand}" != 0 ]; then
@@ -131,9 +130,11 @@ _testssh (){
     fi
 }
 
+
 ##create ssh key
 _createsshkey ()
 {
+    tempath="$($_MKTEMP -d)"
     echo -e "${_green}Creating SSH key...${_nc}";
     ssh-keygen -q -t rsa -b 4096 -f "${tempath}"/temp-MA.ed25519 -C 'For NX-Migrations' -N '';
     _catsshkeypub=$(cat "${tempath}"/temp-MA.ed25519.pub);
@@ -142,9 +143,17 @@ _createsshkey ()
     echo "Key was created in this location: ${tempath}"
 }
 
+#remove the temp directory created at start
+_cleanup(){
+
+   printf "\n${_green}%sCleaning up..."
+   rm -r "${tempath}"
+   printf "Done%s\n${_nc}"
+}
+
 #ask if key is installed
 _askkey(){
-
+    trap "_cleanup" EXIT
     read -r -p "${_cyan}Key installed?: ${_nc}" _key;
     case "${_key}" in
         "Y" | "y" | "yes" | "YES" | "Yes")
@@ -320,7 +329,8 @@ _pinnednote(){
        echo "Target php: ${_targetphp}"
     fi
     echo -e "Redis, Elastic-Search and Varnish
-Remove the ssh pub-key${_nc}"
+Remove the ssh pub-key
+Copy crontab${_nc}"
 
 }
 
@@ -425,19 +435,9 @@ main () {
   done
 }
 
-#remove the temp directory created at start
-_cleanup(){
-
-   printf "\n${_green}%sCleaning up..."
-   rm -r "${tempath}"
-   printf "Done%s\n${_nc}"
-}
 
     if [[ -z ${_domchk} ]]; then
        echo -e "${_red}Must be in a domain directory${_nc}"
        exit 1
-    fi
-    if [[ "$1" != "-k" ]]; then
-       trap "_cleanup" EXIT
     fi
 main;
