@@ -377,7 +377,7 @@ _cmdline() {
 
   local x;
 
-  for x in ${ARGA[*]}; do
+  for x in "${ARGA[@]}"; do
 
     case "$x" in
       "--final"|"-f")
