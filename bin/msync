@@ -1,4 +1,5 @@
 #! /usr/bin/env bash
+###Created by Abe k for MA to MA migrations##
 # Script Arguments
 readonly ARGA=("$@")
 readonly _MKTEMP="/bin/mktemp"
@@ -21,8 +22,7 @@ _usage() {
 msync version 1.0
 Description: Run initial and finial sync for Magento
  Usage: msync [Option]
- 
-         Supported Options:
+         Supported options:
           -f|--final       Run Final Sync [db + (pub or media) folder]
           -h|--help        Display this message
           -i|--initial     Run Initial Sync
@@ -30,11 +30,11 @@ Description: Run initial and finial sync for Magento
 EOF
 
 }
-
  #get hostname
 _gethost (){
  #get hostname#
     _sdate=$(date "+%A %B %d %T %y")
+    echo "${_cyan}Msync Start: ${_sdate}"
     echo -e "${_blue}###### Source Info ######";
     read -r -p "${_cyan}Host: ${_nc}" _host;
      case "${_host}" in
@@ -233,7 +233,7 @@ _dumpdb(){
 _rsyncfilesinitial(){
 
     echo -e "${_green}Starting Rsync..."
-    sudo rsync -e "ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -i ${tempath}/temp-MA.ed25519 -p${_port}" -vrltD --stats --human-readable "${_susr}"@"${_host}":"${_appdocroot}"/ ./ | pv -lep -s "${_rsync_size}" >/dev/null
+    sudo rsync -e "ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -i ${tempath}/temp-MA.ed25519 -p${_port}" -vrltD --stats --human-readable "${_susr}"@"${_host}":"${_appdocroot}"/ ./ | pv -blep -s "${_rsync_size}" >/dev/null
     sudo chown -R "${_usr}". ./
     echo -e "${_nc}"
 
@@ -243,7 +243,7 @@ _rsyncfilesinitial(){
 _rsyncfilesfinal(){
 
     echo -e "${_green}Starting Rsync..."
-    sudo rsync -e "ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -i ${tempath}/temp-MA.ed25519 -p${_port}" -vrltD --stats --human-readable "${_susr}"@"${_host}":"${_appdocroot}"/"${_pub_media}"/ ./"${_pub_media}"/ | pv -lep -s "${_rsync_size_final}" >/dev/null
+    sudo rsync -e "ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -i ${tempath}/temp-MA.ed25519 -p${_port}" -vrltD --stats --human-readable "${_susr}"@"${_host}":"${_appdocroot}"/"${_pub_media}"/ ./"${_pub_media}"/ | pv -blep -s "${_rsync_size_final}" >/dev/null
     sudo chown -R "${_usr}". ./
     echo -e "${_nc}"
 }
@@ -309,8 +309,8 @@ _configenvf(){
 
 #ending info to add in a ticket
 _pinnednote(){
-    echo "${_cyan}Msync Start: ${_sdate}"
     _edate=$(date "+%A %B %d %T %y")
+    echo "${_cyan}Msync Start: ${_sdate}"
     echo "${_cyan}Msync Finish: ${_edate}"
     echo "Source Host: ${_host}"
     echo "Source path: ${_appdocroot}"
