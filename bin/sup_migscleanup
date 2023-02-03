@@ -1,0 +1,25 @@
+sup_migscleanup ()
+{
+    local _usr _usr_path _migfiles _dom _domchk;
+    _usr="$(pwd | grep --color=auto -Po "/(chroot/)?home/\K[^/]*")";
+    _dom="$(pwd | grep --color=auto -Po "/(chroot/)?home/${_usr}/\K[^/]*")";
+    _domchk=$(find /etc/httpd/conf.d/ -type f -iname "vhost_${_dom}.conf");
+    if [[ -z ${_domchk} ]]; then
+        echo -e "${_red}Must be in a domain directory${_nc}";
+        return 1;
+    fi;
+    _usr_path="/home/${_usr}";
+    _migfiles="$(sudo find ./ -maxdepth 2 -type f \( -iname NXMG\*.sql -o -iname NXMG\*.tar.gz -o -iname NXMG\*.tgz -o -iname NXMG\*.sql.gz \))";
+    if [[ -z "${_migfiles}" ]]; then
+        echo "No files found";
+    else
+        echo "Migration related files found";
+        echo "-----------------------------";
+        echo "${_migfiles}";
+        echo "";
+        printf "%sMoving files to this location ${_usr_path}...";
+        sudo find ./ -maxdepth 2 -type f \( -iname NXMG\*.sql -o -iname NXMG\*.tar.gz -o -iname NXMG\*.tgz -o -iname NXMG\*.sql.gz \) -exec sudo mv -t ${_usr_path} {} \;;
+        printf "done\n";
+    fi;
+    unset _usr _usr_path _migfiles _dom _domchk
+}
