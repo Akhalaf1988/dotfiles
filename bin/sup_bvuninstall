@@ -1,0 +1,34 @@
+sup_bvuninstall ()
+{
+    local _usr _dom _pass _wp _phpv _admincheck _bvcheck _bvactive;
+    readonly _wp="/usr/local/bin/wp";
+    readonly _phpv="/usr/bin/php74";
+    _usr="$(sup_getusr)";
+    _dom="$(sup_getdomain)";
+    echo "${_dom}";
+    if [[ ! -e "$(pwd)/wp-config.php" ]]; then
+        echo "No Wordpress install in this location";
+        return 1;
+    fi;
+    _admincheck="$(sudo -u "${_usr}" "${_phpv}" "${_wp}" user list | grep nxmigration | awk '{print $2}')";
+    if [[ -n "${_admincheck}" ]]; then
+        echo "Removing Admin user";
+        sudo -u "${_usr}" "${_phpv}" "${_wp}" user delete nxmigration --yes;
+    else
+        echo "nxmigration user not found";
+    fi;
+    _bvcheck="$(sudo -u "${_usr}" "${_phpv}" "${_wp}" plugin list | grep  "migrate-to-liquidweb" | awk '{print $1}')";
+    _bvactive="$(sudo -u "${_usr}" "${_phpv}" "${_wp}" plugin list | grep  "migrate-to-liquidweb" | awk '{print $2}')";
+    if [[ -n "${_bvcheck}" && "${_bvactive}" == "active" ]]; then
+        echo "Removing migrate-to-liquidweb plugin";
+        sudo -u "${_usr}" "${_phpv}" "${_wp}" plugin deactivate migrate-to-liquidweb --uninstall;
+    else
+        if [[ -n "${_bvcheck}" && "${_bvactive}" != "active" ]]; then
+            echo "Removing migrate-to-liquidweb plugin";
+            sudo -u "${_usr}" "${_phpv}" "${_wp}" plugin uninstall migrate-to-liquidweb;
+            echo "";
+        else
+            echo "No migrate-to-liquidweb plugin found";
+        fi;
+    fi
+}
