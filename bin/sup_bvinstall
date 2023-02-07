@@ -1,0 +1,41 @@
+sup_bvinstall ()
+{
+    local _usr _dom _pass _wp _phpv _admincheck _bvcheck _bvactive;
+    readonly _wp="/usr/local/bin/wp";
+    readonly _phpv="/usr/bin/php74";
+    _usr="$(sup_getusr)";
+    _dom="$(sup_getdomain)";
+    echo "${_dom}";
+    if [[ ! -e "$(pwd)/wp-config.php" ]]; then
+        echo "No Wordpress install in this location";
+        return 1;
+    fi;
+    _pass="dimdiscoveredspheroconicBrasovessaylet34";
+    _admincheck="$(sudo -u "${_usr}" "${_phpv}" "${_wp}" user list | grep nxmigration | awk '{print $2}')";
+    if [[ -z "${_admincheck}" ]]; then
+        echo "Creating Admin user";
+        sudo -u "${_usr}" "${_phpv}" "${_wp}" user create nxmigration migrations@liquidweb.com --role=administrator --user_pass="${_pass}";
+        echo "User: nxmigration";
+    else
+        echo "nxmigration user found, resetting password";
+        sudo -u "${_usr}" "${_phpv}" "${_wp}" user update nxmigration --user_pass="${_pass}";
+        echo "User: nxmigration";
+    fi;
+    _bvcheck="$(sudo -u "${_usr}" "${_phpv}" "${_wp}" plugin list | grep  "migrate-to-liquidweb" | awk '{print $1}')";
+    _bvactive="$(sudo -u "${_usr}" "${_phpv}" "${_wp}" plugin list | grep  "migrate-to-liquidweb" | awk '{print $2}')";
+    if [[ -n "${_bvcheck}" && "${_bvactive}" == "active" ]]; then
+        echo "migrate-to-liquidweb plugin detected";
+        echo "Status: installed/active";
+        echo "";
+    else
+        if [[ -n "${_bvcheck}" && "${_bvactive}" != "active" ]]; then
+            echo "migrate-to-liquidweb plugin detected";
+            echo "Status: inactive..activating..";
+            sudo -u "${_usr}" "${_phpv}" "${_wp}" plugin activate migrate-to-liquidweb;
+            echo "";
+        else
+            sudo -u "${_usr}" "${_phpv}" "${_wp}" plugin install migrate-to-liquidweb --activate;
+            echo "";
+        fi;
+    fi
+}
