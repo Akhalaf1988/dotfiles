@@ -14,11 +14,11 @@ sup_bvinstall ()
     _admincheck="$(sudo -u "${_usr}" "${_phpv}" "${_wp}" user list | grep nxmigration | awk '{print $2}')";
     if [[ -z "${_admincheck}" ]]; then
         echo "Creating Admin user";
-        sudo -u "${_usr}" "${_phpv}" "${_wp}" user create nxmigration migrations@liquidweb.com --role=administrator --user_pass="${_pass}";
+        sudo -u "${_usr}" "${_phpv}" "${_wp}" user create nxmigration migrations@liquidweb.com --role=administrator --user_pass="${_pass}" --skip-plugins --skip-themes;
         echo "User: nxmigration";
     else
         echo "nxmigration user found, resetting password";
-        sudo -u "${_usr}" "${_phpv}" "${_wp}" user update nxmigration --user_pass="${_pass}";
+        sudo -u "${_usr}" "${_phpv}" "${_wp}" user update nxmigration --user_pass="${_pass}" --skip-plugins --skip-themes;
         echo "User: nxmigration";
     fi;
     _bvcheck="$(sudo -u "${_usr}" "${_phpv}" "${_wp}" plugin list | grep  "migrate-to-liquidweb" | awk '{print $1}')";
@@ -31,10 +31,10 @@ sup_bvinstall ()
         if [[ -n "${_bvcheck}" && "${_bvactive}" != "active" ]]; then
             echo "migrate-to-liquidweb plugin detected";
             echo "Status: inactive..activating..";
-            sudo -u "${_usr}" "${_phpv}" "${_wp}" plugin activate migrate-to-liquidweb;
+            sudo -u "${_usr}" "${_phpv}" "${_wp}" plugin activate migrate-to-liquidweb --skip-plugins --skip-themes;
             echo "";
         else
-            sudo -u "${_usr}" "${_phpv}" "${_wp}" plugin install migrate-to-liquidweb --activate;
+            sudo -u "${_usr}" "${_phpv}" "${_wp}" plugin install migrate-to-liquidweb --activate --skip-plugins --skip-themes;
             echo "";
         fi;
     fi
