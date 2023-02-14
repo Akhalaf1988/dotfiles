@@ -13,7 +13,7 @@ sup_bvuninstall ()
     _admincheck="$(sudo -u "${_usr}" "${_phpv}" "${_wp}" user list | grep nxmigration | awk '{print $2}')";
     if [[ -n "${_admincheck}" ]]; then
         echo "Removing Admin user";
-        sudo -u "${_usr}" "${_phpv}" "${_wp}" user delete nxmigration --yes;
+        sudo -u "${_usr}" "${_phpv}" "${_wp}" user delete nxmigration --yes --skip-plugins --skip-themes;
     else
         echo "nxmigration user not found";
     fi;
@@ -21,11 +21,11 @@ sup_bvuninstall ()
     _bvactive="$(sudo -u "${_usr}" "${_phpv}" "${_wp}" plugin list | grep  "migrate-to-liquidweb" | awk '{print $2}')";
     if [[ -n "${_bvcheck}" && "${_bvactive}" == "active" ]]; then
         echo "Removing migrate-to-liquidweb plugin";
-        sudo -u "${_usr}" "${_phpv}" "${_wp}" plugin deactivate migrate-to-liquidweb --uninstall;
+        sudo -u "${_usr}" "${_phpv}" "${_wp}" plugin deactivate migrate-to-liquidweb --uninstall --skip-plugins --skip-themes;
     else
         if [[ -n "${_bvcheck}" && "${_bvactive}" != "active" ]]; then
             echo "Removing migrate-to-liquidweb plugin";
-            sudo -u "${_usr}" "${_phpv}" "${_wp}" plugin uninstall migrate-to-liquidweb;
+            sudo -u "${_usr}" "${_phpv}" "${_wp}" plugin uninstall migrate-to-liquidweb --skip-plugins --skip-themes;
             echo "";
         else
             echo "No migrate-to-liquidweb plugin found";
