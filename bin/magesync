@@ -34,9 +34,9 @@ declare -A DB
 # Print usage
 _usage() {
   cat <<- EOF
-msync version ${SCRIPT_VERSION}
+magesync version ${SCRIPT_VERSION}
 Description: Run initial and finial sync for Magento
- Usage: msync [Option]
+ Usage: magesync [Option]
          Supported options:
           -f|--final       Run Final Sync [db + (pub or media) folder]
           -h|--help        Display this message
@@ -377,8 +377,8 @@ _configenv() {
 _pinnednote() {
   _edate=$(date "+%A %B %d %T %y")
 
-  echo "${_cyan}Msync Start: ${_sdate}"
-  echo "${_cyan}Msync Finish: ${_edate}"
+  echo "${_cyan}Magesync Start: ${_sdate}"
+  echo "${_cyan}Magesync Finish: ${_edate}"
   echo "Source Host: ${_host}"
   echo "Source path: ${_appdocroot}"
   echo "CMS Version: ${_CMSVERSON}"
@@ -479,7 +479,7 @@ main () {
   _date="$(date +%m-%d-%y-"%R" | sed 's/:/-/g')"
   _usrpath="/home/${_usr}";
   _sdate=$(date "+%A %B %d %T %y")
-  echo "${_cyan}Msync Start: ${_sdate}"
+  echo "${_cyan}Magesync Start: ${_sdate}"
   _dschk
   _gethost
   _getusername
