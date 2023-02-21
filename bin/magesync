@@ -7,7 +7,7 @@
 # 3) Abstract ssh/rsync to separate functions
 # 4) Abstract xmllint to separate functions
 # 5) Use arrays for variable values
-# 6) Combine prints/echoes where possible
+# 6) Combine prints/echoes where possible #done
 # 7) Fix ssh/rsync flags. #done
 # 8) Reduce global variables by passing function parameters
 
