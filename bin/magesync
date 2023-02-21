@@ -1,25 +1,50 @@
 #! /usr/bin/env bash
 ###Created by Abe k for MA to MA migrations##
+#
+# TODO
+# 1) Combine init/final functions #done
+# 2) Abstract sudo to a separate function
+# 3) Abstract ssh/rsync to separate functions
+# 4) Abstract xmllint to separate functions
+# 5) Use arrays for variable values
+# 6) Combine prints/echoes where possible
+# 7) Fix ssh/rsync flags. #done
+# 8) Reduce global variables by passing function parameters
+
+SCRIPT_VERSION='1.0'
+
 # Script Arguments
 readonly ARGA=("$@")
 readonly _MKTEMP="/bin/mktemp"
 
-_red='\033[0;31m'
+_red=$'\033[0;31m'
 _nc=$'\033[0m'
 _blue='\033[1;34m'
 _green='\033[0;32m'
 _cyan=$'\033[0;36m'
-_date="$(date +%m-%d-%y-"%R" | sed 's/:/-/g')"
-_usr="$(pwd | grep --color=auto -Po "/(chroot/)?home/\K[^/]*")";
-_usrpath="/home/${_usr}";
-_dom="$(pwd| grep --color=auto -Po "/(chroot/)?home/${_usr}/\K[^/]*")";
-_domchk=$(find /etc/httpd/conf.d/ -type f -iname "vhost_${_dom}.conf")
+
+SSH_OPTS=(
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'LogLevel=quiet'
+  -o 'StrictHostKeyChecking=no'
+  -o 'PreferredAuthentications=publickey'
+)
+
+MYSQLDUMP_OPTS=(
+  "--opt"
+  "--skip-lock-tables"
+  "--routines"
+  "--max_allowed_packet=2G"
+)
+
+SYNC=''
+
+declare -A DB
 
 # Print usage
 _usage() {
-
   cat <<- EOF
-msync version 1.0
+msync version ${SCRIPT_VERSION}
 Description: Run initial and finial sync for Magento
  Usage: msync [Option]
          Supported options:
@@ -28,358 +53,380 @@ Description: Run initial and finial sync for Magento
           -i|--initial     Run Initial Sync
           -k|--key         Generate SSH Key
 EOF
-
 }
- #get hostname
-_gethost (){
- #get hostname#
-    _sdate=$(date "+%A %B %d %T %y")
-    echo "${_cyan}Msync Start: ${_sdate}"
-    echo -e "${_blue}###### Source Info ######";
-    read -r -p "${_cyan}Host: ${_nc}" _host;
-     case "${_host}" in
-        "*" | "*.com" | "" | "*.*" | "*.org" | "*.net" | ".*" | "*.com.*")
-        echo -e "${_red}Not an accepted Hostname${_nc}";
-        exit 1
-        ;;
-        *)
-        ;;
-      esac
- #get username
+
+#check diskspace on local
+_dschk() {
+  echo -e "${_green}Local Disk Space"
+
+  df -h | grep -E 'File|/$|chroot'
+
+  printf "\n%8s %12s %14s %14s\n%-10s" "Username" "Used(%)" "Used(G)" "Total(G)" "${_usr}";
+
+  sudo quota -g "${_usr}" \
+    | tail -1\
+    | awk '{printf "%10.3f%%  %10.3f GB  %10.3f GB",($2/$3*100),($2/1000/1024),($3/1000/1024)}'
+}
+
+#get hostname
+_gethost(){
+  #get hostname
+   echo "";
+   echo -e "${_blue}###### Source Info ######";
+   while true; do
+    read -r -p "${_cyan}SSH Host: ${_nc}" _host;
+     if [[ -z "${_host}" \
+       || "${_host}" == "*" \
+       || "${_host}" == "*.com" ]]; then
+       echo -e "${_red}'${_host}' is not an accepted value${_nc}"
+       continue # Go to the top of the loop
+    fi
+       break # Valid input given so exit the loop.
+    done
+}
+
+_getusername(){
+  #get username
+   while true; do
     read -r -p "${_cyan}SSH User: ${_nc}" _susr;
-    case "${_susr}" in
-        "*" | "" | "/*" | "/home/*")
-        echo -e "${_red}Not an accepted Username${_nc}";
-        exit 1
-        ;;
-        *)
-        ;;
-    esac
- #get port
-    read -r -p "${_cyan}Port: ${_nc}" _port;
-    if [[ -z ${_port} ]]; then
-        _port='22';
-    fi;
- #get path to main install
+    if [[ -z "${_susr}" \
+    || "${_susr}" == "*" \
+    || "${_susr}" == "/home" \
+    || "${_susr}" == "/*" ]]; then
+       echo -e "${_red}${_susr} is not an accepted value${_nc}"
+       continue # Go to the top of the loop
+    fi
+    break # Valid input given so exit the loop.
+done
+
+}
+
+_getport(){
+  #get port
+  read -r -p "${_cyan}Port: ${_nc}" _port;
+  if [[ -z ${_port} ]]; then
+    _port='22';
+  fi;
+  SSH_OPTS+=("-p" "${_port}")
+}
+_getpath(){
+  #get path to main install
+   while true; do
     read -r -p "${_cyan}Path To Sitefiles: ${_nc}" _appdocroot;
-    case "${_appdocroot}" in
-        "/" | "/var" | "/root" | "/home" | "/*" | "*" | "./*" | "")
-        echo -e "${_red}Not an accepted path${_nc}";
-        exit 1
-        ;;
-        *)
-        ;;
-    esac
-#get CMS version
-        read -r -p "${_cyan}Pick CMS Version (1/2): ${_nc}" _CMSVERSON;
-        case $_CMSVERSON in
-                1)
-                _cms='1'
-                _env="local.xml"
-                _pub_media="media"
-                ;;
-                2)
-                _cms='2'
-                _env="env.php"
-                _pub_media="pub"
-                ;;
-                *)
-                echo -e "${_red}Not a supported version${_nc}"
-                exit 1
-                ;;
-         esac
-}
-
-
-#check diskspace on local#
-_dschk(){
-   printf "%s${_green}Checking local Disk Space..."
-   echo;
-   df -h | grep -E 'File|/$|chroot'
-   echo;
-   printf "%8s %12s %14s %14s" "Username" "Used(%)" "Used(G)" "Total(G)";
-   printf "\n%-10s" "${_usr}";
-   sudo quota -g "${_usr}" 2> /dev/null | tail -1 | awk '{printf "%10.3f%%  %10.3f GB  %10.3f GB",($2/$3*100),($2/1000/1024),($3/1000/1024)}' 2> /dev/null
-   echo;
-   read -r -p "${_cyan}Safe to proceed (y/n): ${_nc}" _stp
-    case "${_stp}" in
-        "Y" | "y" | "yes" | "YES" | "Yes")
-        _gethost
-        ;;
-        "n" | "N" | "no"  | "NO" | "No")
-        echo -e "${_green}Exiting${_nc}"
-        exit 0
-        ;;
-        *)
-         echo -e "${_red}Input required, exiting${_nc}"
-         exit 1
-        ;;
-    esac
-}
-
-#test ssh connection
-_testssh (){
-
-    if [[ -e ${tempath}/temp-MA.ed25519 ]]; then
-       echo -e "${_green}Testing ssh connecting...${_nc}";
-       ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "printf '%s${_green}ssh connection successful\n${_nc}'" 2> /dev/null;
-       _lastcommand="$?";
+    if [[ -z "${_appdocroot}" \
+    || "${_appdocroot}" == "*" \
+    || "${_appdocroot}" == "/home" \
+    || "${_appdocroot}" == "/*" \
+    || "${_appdocroot}" == "/root" \
+    || "${_appdocroot}" == "/var" \
+    || "${_appdocroot}" == "./*"
+    || "${_appdocroot}" == "/" ]]; then
+       echo -e "${_red}${_appdocroot} is not an accepted value${_nc}"
+       continue # Go to the top of the loop
     fi
-    if [ "${_lastcommand}" != 0 ]; then
-        echo -e "${_red}ssh test failed\n${_nc}";
-        exit 1
-    fi
+    break # Valid input given so exit the loop.
+done
 }
 
+_cmsv(){
+  #get CMS version
+  echo ""
+  echo "${_cyan}Select CMS Version"
+  echo ""
+  echo "1) - Magento1"
+  echo "2) - Magento2"
+  echo ""
+  read -r -p "CMS Version: ${_nc}" _CMSVERSON;
+  case $_CMSVERSON in
+    1)
+      _cms='1'
+      _env="local.xml"
+      _pub_media="media"
+      ;;
+    2)
+      _cms='2'
+      _env="env.php"
+      _pub_media="pub"
+      ;;
+    *)
+      echo -e "${_red}Please Select a number 1 or 2${_nc}"
+      _cmsv
+      ;;
+  esac
+}
 
 ##create ssh key
-_createsshkey ()
-{
-    tempath="$($_MKTEMP -d)"
-    echo -e "${_green}Creating SSH key...${_nc}";
-    ssh-keygen -q -t rsa -b 4096 -f "${tempath}"/temp-MA.ed25519 -C 'For NX-Migrations' -N '';
-    _catsshkeypub=$(cat "${tempath}"/temp-MA.ed25519.pub);
-    echo "${_catsshkeypub}";
-    echo ""
-    echo "Key was created in this location: ${tempath}"
-}
+_createsshkey () {
+  tempath="$($_MKTEMP -d)"
+  echo -e "${_green}Creating SSH key...${_nc}";
 
-#remove the temp directory created at start
-_cleanup(){
+  ssh-keygen -q -t rsa -b 4096 -f "${tempath}"/temp-MA.ed25519 -C 'For NX-Migrations' -N '';
+  SSH_OPTS+=(-i "${tempath}/temp-MA.ed25519")
 
-   printf "\n${_green}%sCleaning up..."
-   rm -r "${tempath}"
-   printf "Done%s\n${_nc}"
+  _catsshkeypub=$(cat "${tempath}"/temp-MA.ed25519.pub);
+
+  printf "%s\nKey was created in this location: %s\n" "${_catsshkeypub}" "${tempath}"
 }
 
 #ask if key is installed
-_askkey(){
-    trap "_cleanup" EXIT
-    read -r -p "${_cyan}Key installed?: ${_nc}" _key;
-    case "${_key}" in
-        "Y" | "y" | "yes" | "YES" | "Yes")
-            _testssh
-        ;;
-        *)
-            echo -e "${_red}Exiting Script${_nc}"
-            exit 1
-        ;;
-    esac
+_askkey() {
+  trap "_cleanup" EXIT
+
+  read -r -p "${_cyan}Key installed?: ${_nc}" _key;
+  case "${_key}" in
+    "Y" | "y" | "yes" | "YES" | "Yes")
+      _testssh
+      ;;
+    *)
+      echo -e "${_red}Exiting Script${_nc}"
+      exit 1
+      ;;
+  esac
+}
+
+#test ssh connection
+_testssh () {
+  if [[ -e ${tempath}/temp-MA.ed25519 ]]; then
+    echo -e "${_green}Testing ssh connecting...${_nc}";
+#shellcheck disable=SC2029
+    ssh "${SSH_OPTS[@]}" "${_susr}"@"${_host}" "echo -e '${_green}ssh connection successful\n${_nc}'" 2> /dev/null;
+    _lastcommand="$?";
+
+  fi
+  _sshchk
+}
+_sshchk(){
+  if [ "${_lastcommand}" != 0 ]; then
+  read -r -p "${_red}ssh test failed, would you like to try again? (Y/n): ${_nc}" _sshchks
+  case "${_sshchks}" in
+    "Y" | "y" | "yes" | "YES" | "Yes")
+     _testssh
+      ;;
+    "n" | "N" | "no"  | "NO" | "No")
+      echo -e "${_green}Exiting${_nc}"
+      exit 0
+      ;;
+    *)
+      echo -e "${_red}Input required${_nc}"
+      _sshchk
+      ;;
+  esac
+  fi
+}
+
+#remove the temp directory created at start
+_cleanup() {
+
+  printf "\n${_green}%sCleaning up..."
+  rm -r "${tempath}"
+  printf "Done%s\n${_nc}"
+
 }
 
 #stat the config file and exit if it doesnt exist, grab it if it does.
-_stat_n_cat(){
-    echo -e "${_green}Gathering Info..."
-    ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "stat ${_appdocroot}/app/etc/${_env}" > /dev/null
-    _nlastcommand="$?";
-    if [ "${_nlastcommand}" != 0 ]; then
-        exit 1
-    fi
-    ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "cat ${_appdocroot}/app/etc/${_env}" | tee "${tempath}"/MA-dbinfo.txt > /dev/null
+_stat_n_cat() {
+  echo -e "${_green}Gathering Info..."
+#shellcheck disable=SC2029
+  if ! ssh "${SSH_OPTS[@]}" "${_susr}"@"${_host}" "stat ${_appdocroot}/app/etc/${_env}" > /dev/null; then
+    echo -e "${_red}Stat failed on config file, please make sure info was entered correctly${_nc}"
+    exit 1
+  fi
+
+#shellcheck disable=SC2029
+ ssh "${SSH_OPTS[@]}" "${_susr}"@"${_host}" "cat ${_appdocroot}/app/etc/${_env}" > "${tempath}"/MA-dbinfo.txt
 }
 
-#gather info from config file
-_gatherinfo(){
-    if [[ "${_cms}" == "2" ]]; then
-       _db=$(grep -E 'dbname|DB_NAME' "${tempath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
-       _dbu=$(grep -E 'username|DB_USER' "${tempath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
-       _dbpass=$(grep -E 'password|DB_PASSWORD' "${tempath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
-       _dbhost=$(grep -E 'host' "${tempath}"/MA-dbinfo.txt | cut -d \' -f 4 | head -n1)
-    else
-       _db="$(echo "cat /config/global/resources/default_setup/connection/dbname/text()" | xmllint --nocdata --shell "${tempath}"/MA-dbinfo.txt | sed '1d;$d')"
-       _dbu="$(echo "cat /config/global/resources/default_setup/connection/username/text()" | xmllint --nocdata --shell "${tempath}"/MA-dbinfo.txt | sed '1d;$d')"
-       _dbpass="$(echo "cat /config/global/resources/default_setup/connection/password/text()" | xmllint --nocdata --shell "${tempath}"/MA-dbinfo.txt | sed '1d;$d')"
-       _dbhost="$(echo "cat /config/global/resources/default_setup/connection/host/text()" | xmllint --nocdata --shell "${tempath}"/MA-dbinfo.txt | sed '1d;$d')"
-    fi
+
+_dbinfo_magento1(){
+
+    DB['NAME']="$(echo "cat /config/global/resources/default_setup/connection/dbname/text()" | xmllint --nocdata --shell "${config}" | sudo sed '1d;$d')"
+    DB['USER']="$(echo "cat /config/global/resources/default_setup/connection/username/text()" | xmllint --nocdata --shell "${config}" | sudo sed '1d;$d')"
+    DB['PASS']="$(echo "cat /config/global/resources/default_setup/connection/password/text()" | xmllint --nocdata --shell "${config}" | sudo sed '1d;$d')"
+    DB['HOST']="$(echo "cat /config/global/resources/default_setup/connection/host/text()" | xmllint --nocdata --shell "${config}" | sudo sed '1d;$d')"
+
 }
 
-#all info in initial is in that temp dir, on final we need to swap what is currently in the local.xml or env.php
-_gatherinfofinal(){
-    if [[ "${_cms}" == "2" ]]; then
-       _dbf=$(sudo grep -E 'dbname|DB_NAME' app/etc/env.php | cut -d \' -f 4 | head -n1)
-       _dbuf=$(sudo grep -E 'username|DB_USER' app/etc/env.php | cut -d \' -f 4 | head -n1)
-       _dbpassf=$(sudo grep -E 'password|DB_PASSWORD' app/etc/env.php | cut -d \' -f 4 | head -n1)
-       _dbhostf=$(sudo grep -E 'host' app/etc/env.php | cut -d \' -f 4 | head -n1)
-    else
-       _dbf="$(echo "cat /config/global/resources/default_setup/connection/dbname/text()" | sudo -u "${_usr}" xmllint --nocdata --shell app/etc/"${_env}" | sudo -u "${_usr}" sed '1d;$d')"
-       _dbuf="$(echo "cat /config/global/resources/default_setup/connection/username/text()" | sudo -u "${_usr}" xmllint --nocdata --shell app/etc/"${_env}" | sudo -u "${_usr}" sed '1d;$d')"
-       _dbpassf="$(echo "cat /config/global/resources/default_setup/connection/password/text()" | sudo -u "${_usr}" xmllint --nocdata --shell app/etc/"${_env}" | sudo -u "${_usr}" sed '1d;$d')"
-       _dbhostf="$(echo "cat /config/global/resources/default_setup/connection/host/text()" | sudo -u "${_usr}" xmllint --nocdata --shell app/etc/"${_env}" | sudo -u "${_usr}" sed '1d;$d')"
-   fi
-}
-_calculate_rsync_initial(){
-    echo "Calculating size. Please wait..."
-    _rsync_size=$(ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "find ${_appdocroot} 2> /dev/null | wc -l")
+_dbinfo_magento2(){
+
+    DB['NAME']=$(sudo grep -E 'dbname|DB_NAME' "${config}" | cut -d \' -f 4 | head -n1)
+    DB['USER']=$(sudo grep -E 'username|DB_USER' "${config}" | cut -d \' -f 4 | head -n1)
+    DB['PASS']=$(sudo grep -E 'password|DB_PASSWORD' "${config}" | cut -d \' -f 4 | head -n1)
+    DB['HOST']=$(sudo grep -E 'host' "${config}" | cut -d \' -f 4 | head -n1)
+
 }
 
-_calculate_rsync_final(){
-    echo "Calculating Size. Please wait..."
-    _rsync_size_final=$(ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "find ${_appdocroot}/${_pub_media} 2> /dev/null | wc -l")
+_gatherinfo() {
+
+  config="${tempath}/MA-dbinfo.txt"
+
+  if [[ "${_cms}" == "2" ]]; then
+      _dbinfo_magento2
+  else
+      _dbinfo_magento1
+  fi
+
+###grab whats currently in config file
+  if [[ "${SYNC}" == "final" && "${_cms}" == "2" ]]; then
+   _configf="app/etc/${_env}"
+   _dbf=$(sudo grep -E 'dbname|DB_NAME' "${_configf}" | cut -d \' -f 4 | head -n1)
+   _dbuf=$(sudo grep -E 'username|DB_USER' "${_configf}" | cut -d \' -f 4 | head -n1)
+   _dbpf=$(sudo grep -E 'password|DB_PASSWORD' "${_configf}" | cut -d \' -f 4 | head -n1)
+   _dbhf=$(sudo grep -E 'host' "${_configf}" | cut -d \' -f 4 | head -n1)
+  else
+     if [[ "${SYNC}" == "final" && "${_cms}" == "1" ]]; then
+     _configf="app/etc/${_env}"
+    _dbf="$(echo "cat /config/global/resources/default_setup/connection/dbname/text()" | sudo -u "${_usr}" xmllint --nocdata --shell "${_configf}" | sudo -u "${_usr}" sed '1d;$d')"
+    _dbuf="$(echo "cat /config/global/resources/default_setup/connection/username/text()" |sudo -u "${_usr}" xmllint --nocdata --shell "${_configf}" | sudo -u "${_usr}" sed '1d;$d')"
+    _dbpf="$(echo "cat /config/global/resources/default_setup/connection/password/text()" |sudo -u "${_usr}" xmllint --nocdata --shell "${_configf}" | sudo -u "${_usr}" sed '1d;$d')"
+    _dbhf="$(echo "cat /config/global/resources/default_setup/connection/host/text()" | sudo -u "${_usr}" xmllint --nocdata --shell "${_configf}" | sudo -u "${_usr}" sed '1d;$d')"
+ fi
+fi
 }
+
+##calcuate the size for pv, counts the amount of files in the path given at start.
+_calculate_rsync() {
+  if [[ "${SYNC}" == "final" ]]; then
+    directory="${_appdocroot}/${_pub_media}"
+  else
+    directory="${_appdocroot}"
+  fi
+
+  echo "Calculating Size. Please wait..."
+  #shellcheck disable=SC2029
+  _rsync_size=$(ssh "${SSH_OPTS[@]}" "${_susr}"@"${_host}" "find ${directory} | wc -l")
+}
+
+#Rsync final and chown. If initial sync everything in the path given to ./ or if final, rsync whats in pub or media.
+_rsyncfiles() {
+  echo -e "${_green}Starting Rsync..."
+  if [[ "${SYNC}" == "final" ]]; then
+    sudo rsync -e "ssh ${SSH_OPTS[*]}" -vrltD --stats --human-readable "${_susr}"@"${_host}":"${_appdocroot}"/"${_pub_media}"/ ".${_pub_media}/" | pv -blep -s "${_rsync_size}" >/dev/null
+  else
+    sudo rsync -e "ssh ${SSH_OPTS[*]}" -vrltD --stats --human-readable "${_susr}"@"${_host}":"${_appdocroot}"/ "./" | pv -blep -s "${_rsync_size}" >/dev/null
+  fi
+  echo "Chowning files...${_nc}"
+  sudo chown -R "${_usr}". ./
+}
+
+
+## DB Functions ##
 
 #Dump source db and put it in a tmp folder.
-_dumpdb(){
+_dumpdb() {
+  echo -e "${_green}Dumping source db..."
 
-    echo -e "${_green}Dumping source db..."
-    _mysqlargs="mysqldump -h ${_dbhost} --opt --skip-lock-tables --routines --max_allowed_packet=2G -u ${_dbu} -p ${_db} --password=${_dbpass}"
-    _sqlfile="${_db}-${_date}-MA.sql.gz"
-    _dbdump=$(ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}" "${_mysqlargs}" | pv -W -b | gzip > "${tempath}"/"${_sqlfile}")
-    echo -e "${_green}${_dbdump}${_nc}"
-
+  MYSQLDUMP_OPTS+=(
+    -h "${DB['HOST']}"
+    -u "${DB['USER']}"
+    -p "${DB['NAME']}"
+    "--password=${DB['PASS']}"
+  )
+  _sqlfile="${DB['NAME']}-${_date}-MA.sql.gz"
+  #shellcheck disable=SC2029
+  _dbdump=$(ssh "${SSH_OPTS[@]}" "${_susr}"@"${_host}" "mysqldump ${MYSQLDUMP_OPTS[*]}" | pv -W -b | gzip > "${tempath}"/"${_sqlfile}")
+  echo -e "${_green}${_dbdump}${_nc}"
 }
-
-
-#Rsync initial
-_rsyncfilesinitial(){
-
-    echo -e "${_green}Starting Rsync..."
-    sudo rsync -e "ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -i ${tempath}/temp-MA.ed25519 -p${_port}" -vrltD --stats --human-readable "${_susr}"@"${_host}":"${_appdocroot}"/ ./ | pv -blep -s "${_rsync_size}" >/dev/null
-    sudo chown -R "${_usr}". ./
-    echo -e "${_nc}"
-
-}
-
-#Rsync final and chown
-_rsyncfilesfinal(){
-
-    echo -e "${_green}Starting Rsync..."
-    sudo rsync -e "ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -i ${tempath}/temp-MA.ed25519 -p${_port}" -vrltD --stats --human-readable "${_susr}"@"${_host}":"${_appdocroot}"/"${_pub_media}"/ ./"${_pub_media}"/ | pv -blep -s "${_rsync_size_final}" >/dev/null
-    sudo chown -R "${_usr}". ./
-    echo -e "${_nc}"
-}
-
 
 #Create db
-_createdb(){
+_createdb() {
+  echo -e "${_green}Creating database...${_nc}"
 
-    echo -e "${_green}Creating database...${_nc}"
-    if [[ -e /usr/local/interworx/lib/dict/words ]]; then
-        _DIC='/usr/local/interworx/lib/dict/words';
-    else
-        _DIC='/usr/share/dict/words'
-    fi
-    _W1="$(shuf -n1000 "${_DIC}" | head -n1)";
-    _W2="$(shuf -n1000 "${_DIC}" | tail -n1)";
-    _W3="$(shuf -n1000 "${_DIC}" | head -n1)";
-    _N="$(seq 99 | sort -R | tail -n1)";
-    _pass="$(echo "${_W1}${_W2}${_W3}${_N}" | sed "s/'//g")"
-    _Ramdom_num="$(shuf -i 111111-999999 -n 1)"
-    _tdb="${_usr}_${_Ramdom_num}"
-    sudo siteworx -u --login_domain="${_dom}" -n -c MysqlDb -a add --name "${_Ramdom_num}" --create_user 1 --user "${_Ramdom_num}" --password "${_pass}" --confirm_password "${_pass}" --host %;
+  if [[ -e /usr/local/interworx/lib/dict/words ]]; then
+    _DIC='/usr/local/interworx/lib/dict/words';
+  else
+    _DIC='/usr/share/dict/words'
+  fi
+
+  _W1="$(shuf -n1000 "${_DIC}" | head -n1)";
+  _W2="$(shuf -n1000 "${_DIC}" | tail -n1)";
+  _W3="$(shuf -n1000 "${_DIC}" | head -n1)";
+  _N="$(seq 99 | sort -R | tail -n1)";
+  _pass="$(echo "${_W1}${_W2}${_W3}${_N}" | sed "s/'//g")"
+  _Ramdom_num="$(shuf -i 111111-999999 -n 1)"
+  _tdb="${_usr}_${_Ramdom_num}"
+
+  sudo siteworx -u --login_domain="${_dom}" -n -c MysqlDb -a add --name "${_Ramdom_num}" --create_user 1 --user "${_Ramdom_num}" --password "${_pass}" --confirm_password "${_pass}" --host %;
 }
 
 #importdb using matt R tool
-_importdb(){
+_importdb() {
+  echo -e "${_green}Importing db..."
 
-    echo -e "${_green}Importing db..."
-    importdb -U "${_usr}" -u "${_tdb}" -d "${_tdb}" -p "${_pass}" -f "${tempath}"/"${_sqlfile}" -y
-    echo -e "${_nc}"
+  importdb -U "${_usr}" -u "${_tdb}" -d "${_tdb}" -p "${_pass}" -f "${tempath}"/"${_sqlfile}" -y
+
+  echo -e "${_nc}"
 }
+
 
 #check php version on source and target to compare at the end in pinned note
-_getphp(){
+_getphp() {
+  echo -e "${_green}Checking PHP Version..."
 
-    echo -e "${_green}Checking PHP Version..."
-    _sourcephp=$(ssh -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -i "${tempath}"/temp-MA.ed25519 "${_susr}"@"${_host}" -p "${_port}"  "php -v" | head -n1 | awk '{print $2}' | cut -d\. -f1-2 |  sed 's/\.//g')
-    _targetphp=$(sudo grep source "${_usrpath}"/.bashrc | cut -d"/" -f4 | sed -r 's/php|u//g')
-    _phpv=$(sudo grep source "${_usrpath}"/.bashrc | awk '{print $2}' | sed 's/enable/root\/usr\/bin\/php/g')
-
-}
-#search replace db, user and host in config file
-_configenv(){
-
-    echo -e "${_green}Updating ${_env}...${_nc}"
-    sudo cp app/etc/"${_env}" app/etc/"${_env}"-MA-"${_date}"
-    sudo grep -il -RF "${_db}" app/etc/"${_env}" | xargs -n1 sudo -u "${_usr}" sed -i -r "s/${_db}/${_tdb}/g" 2> /dev/null
-    sudo grep -il -RF "${_dbu}" app/etc/"${_env}" | xargs -n1 sudo -u "${_usr}" sed -i -r "s/${_dbu}/${_tdb}/g" 2> /dev/null
-    sudo grep -il -RF "${_dbpass}" app/etc/"${_env}" | xargs -n1 sudo -u "${_usr}" sed -i -r "s/${_dbpass}/${_pass}/g" 2> /dev/null
-    sudo grep -il -RF "${_dbhost}" app/etc/"${_env}" | xargs -n1 sudo -u "${_usr}" sed -i -r "s/${_dbhost}/localhost/g" 2> /dev/null
+  _sourcephp=$(ssh "${SSH_OPTS[@]}" "${_susr}"@"${_host}" "php -v" | head -n1 | awk '{print $2}' | cut -d\. -f1-2 |  sed 's/\.//g')
+  _targetphp=$(sudo grep source "${_usrpath}"/.bashrc | cut -d"/" -f4 | sed -r 's/php|u//g')
+  _phpv=$(sudo grep source "${_usrpath}"/.bashrc | awk '{print $2}' | sed 's/enable/root\/usr\/bin\/php/g')
 }
 
-#search replace db, user and host in config file
-_configenvf(){
+#When updating the configuration file, replace the values of "db", "user", and "host" with the new information. If the synchronization is final, search for any instances of the old database information in the configuration file and replace them with the new information generated during creation. If this is the initial synchronization, use the information provided in the "MAdbinfo.txt" file to replace the old database information with the new information
 
-    echo -e "${_green}Updating ${_env}...${_nc}"
-    sudo cp app/etc/"${_env}" app/etc/"${_env}"-MA-"${_date}"
-    sudo grep -il -RF "${_dbf}" app/etc/"${_env}" | xargs -n1 sudo -u "${_usr}" sed -i -r "s/${_dbf}/${_tdb}/g" 2> /dev/null
-    sudo grep -il -RF "${_dbuf}" app/etc/"${_env}" | xargs -n1 sudo -u "${_usr}" sed -i -r "s/${_dbuf}/${_tdb}/g" 2> /dev/null
-    sudo grep -il -RF "${_dbpassf}" app/etc/"${_env}" | xargs -n1 sudo -u "${_usr}" sed -i -r "s/${_dbpassf}/${_pass}/g" 2> /dev/null
-    sudo grep -il -RF "${_dbhostf}" app/etc/"${_env}" | xargs -n1 sudo -u "${_usr}" sed -i -r "s/${_dbhostf}/localhost/g" 2> /dev/null
+_configenv() {
+  echo -e "${_green}Updating ${_env}...${_nc}"
+
+  ##backup config file
+  sudo -u "${_usr}" cp app/etc/"${_env}" app/etc/"${_env}"-MA-"${_date}"
+
+  if [[ "${SYNC}" == "final" ]]; then
+    sudo -u "${_usr}" sed -i -e "s/${_dbf}/${_tdb}/g" -e "s/${_dbuf}/${_tdb}/g" -e "s/${_dbpf}/${_pass}/g" -e "s/${_dbhf}/localhost/g" app/etc/"${_env}"
+  else
+    sudo -u "${_usr}" sed -i -e "s/${DB['NAME']}/${_tdb}/g" -e "s/${DB['USER']}/${_tdb}/g" -e "s/${DB['PASS']}/${_pass}/g" -e "s/${DB['HOST']}/localhost/g" app/etc/"${_env}"
+  fi
+
 }
 
 #ending info to add in a ticket
-_pinnednote(){
-    _edate=$(date "+%A %B %d %T %y")
-    echo "${_cyan}Msync Start: ${_sdate}"
-    echo "${_cyan}Msync Finish: ${_edate}"
-    echo "Source Host: ${_host}"
-    echo "Source path: ${_appdocroot}"
-    echo "CMS Version: ${_CMSVERSON}"
-    echo "Disk space info on Target"
-    df -h | grep -E 'File|/$|chroot'
-    echo;
-    printf "%8s %12s %14s %14s" "Username" "Used(%)" "Used(G)" "Total(G)";
-    printf "\n%-10s" "${_usr}";
-    sudo quota -g "${_usr}" 2> /dev/null | tail -1 | awk '{printf "%10.3f%%  %10.3f GB  %10.3f GB",($2/$3*100),($2/1000/1024),($3/1000/1024)}' 2> /dev/null
-    echo;
-    echo -e "${_red}Things to check for"
-    echo "-------------------"
-    if [[ "${_sourcephp}" != "${_targetphp}" ]]; then
-       echo "Source and Target php versions do not match!"
-       echo "Source php: ${_sourcephp}"
-       echo "Target php: ${_targetphp}"
-    fi
-    echo -e "Redis, Elastic-Search and Varnish
-Remove the ssh pub-key
-Copy crontab${_nc}"
+_pinnednote() {
+  _edate=$(date "+%A %B %d %T %y")
 
+  echo "${_cyan}Msync Start: ${_sdate}"
+  echo "${_cyan}Msync Finish: ${_edate}"
+  echo "Source Host: ${_host}"
+  echo "Source path: ${_appdocroot}"
+  echo "CMS Version: ${_CMSVERSON}"
+  echo "Disk space info on Target"
+
+  df -h | grep -E 'File|/$|chroot'
+
+  echo;
+  printf "%8s %12s %14s %14s" "Username" "Used(%)" "Used(G)" "Total(G)";
+  printf "\n%-10s" "${_usr}";
+
+  sudo quota -g "${_usr}" \
+    | tail -1 \
+    | awk '{printf "%10.3f%%  %10.3f GB  %10.3f GB",($2/$3*100),($2/1000/1024),($3/1000/1024)}'
+
+  echo;
+  echo -e "${_red}Things to check for"
+  echo "-------------------"
+
+  if [[ "${_sourcephp}" != "${_targetphp}" ]]; then
+    echo "Source and Target php versions do not match!"
+    echo "Source php: ${_sourcephp}"
+    echo "Target php: ${_targetphp}"
+  fi
+
+  echo "Redis, Elastic-Search and Varnish"
+  echo "Remove the ssh pub-key"
+  echo -e "Copy crontab${_nc}"
 }
 
-#run functions for initial in this order
-_initialsync(){
 
-    _dschk;
-    _createsshkey;
-    _askkey;
-    _stat_n_cat;
-    _gatherinfo;
-    _calculate_rsync_initial;
-    _rsyncfilesinitial;
-    _dumpdb;
-    _createdb;
-    _importdb;
-    _getphp;
-    _configenv;
-    _pinnednote;
-
-}
-#run functions in this order
-_finalsync(){
-
-    _dschk;
-    _createsshkey;
-    _askkey;
-    _stat_n_cat;
-    _gatherinfo;
-    _gatherinfofinal;
-    _calculate_rsync_final;
-    _rsyncfilesfinal;
-    _dumpdb;
-    _createdb;
-    _importdb;
-    _getphp;
-    _configenvf;
-    _pinnednote;
-
-}
+## Main Functions ##
 
 # Convert long command line options into short ones for getopts
 _cmdline() {
-
   local x;
 
   for x in "${ARGA[@]}"; do
-
     case "$x" in
       "--final"|"-f")
         args="${args}-f "
@@ -403,42 +450,73 @@ _cmdline() {
   done
 
   echo "$args";
-
 }
 
 # Main
 main () {
-
   local cmdline;
 
   mapfile -t cmdline < <(_cmdline | tr ' ' '\n');
 
   while getopts ":fhik" OPTION "${cmdline[@]}"; do
-
     case $OPTION in
       f)
-        _finalsync;
+        SYNC="final"
         ;;
       h)
         _usage;
+        exit
         ;;
       i)
-       _initialsync
+        SYNC="initial"
         ;;
       k)
-       _createsshkey
+        _createsshkey
+        exit
         ;;
-     "?")
+      "?")
         echo "-${OPTARG} is not a supported option." >&2
         ;;
       *);;
     esac
   done
+
+  if [[ -z "${SYNC}" ]]; then
+    echo "Must pass either --final or --initial sync flag"
+    exit 1
+  fi
+
+  _date="$(date +%m-%d-%y-"%R" | sed 's/:/-/g')"
+  _usrpath="/home/${_usr}";
+  _sdate=$(date "+%A %B %d %T %y")
+  echo "${_cyan}Msync Start: ${_sdate}"
+  _dschk
+  _gethost
+  _getusername
+  _getport
+  _getpath
+  _cmsv
+  _createsshkey
+  _askkey
+  _stat_n_cat
+  _gatherinfo
+  _calculate_rsync
+  _rsyncfiles
+  _dumpdb
+  _createdb
+  _importdb
+  _getphp
+  _configenv
+  _pinnednote
+
 }
 
+_usr="$(pwd | grep --color=auto -Po "/(chroot/)?home/\K[^/]*")";
+_dom="$(pwd| grep --color=auto -Po "/(chroot/)?home/${_usr}/\K[^/]*")";
+_domchk=$(find /etc/httpd/conf.d/ -type f -iname "vhost_${_dom}.conf")
 
-    if [[ -z ${_domchk} ]]; then
-       echo -e "${_red}Must be in a domain directory${_nc}"
-       exit 1
-    fi
+if [[ -z ${_domchk} ]]; then
+  echo -e "${_red}Must be in a domain directory${_nc}"
+  exit 1
+fi
 main;
