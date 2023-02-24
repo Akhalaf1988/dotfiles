@@ -254,10 +254,10 @@ _xmlparse(){
 
 _dbinfo_magento1(){
 
-    DB['NAME']=$(_xmlparse ${config} dbname)
-    DB['USER']=$(_xmlparse ${config} username)
-    DB['PASS']=$(_xmlparse ${config} password)
-    DB['HOST']=$(_xmlparse ${config} host)
+    DB['NAME']=$(_xmlparse "${config}" dbname)
+    DB['USER']=$(_xmlparse "${config}" username)
+    DB['PASS']=$(_xmlparse "${config}" password)
+    DB['HOST']=$(_xmlparse "${config}" host)
 
 }
 
@@ -291,10 +291,10 @@ _gatherinfo() {
   else
      if [[ "${SYNC}" == "final" && "${_cms}" == "1" ]]; then
      _configf="app/etc/${_env}"
-    DBF['NAME']=$(_xmlparse ${_configf} dbname)
-    DBF['USER']=$(_xmlparse ${_configf} username)
-    DBF['PASS']=$(_xmlparse ${_configf} password)
-    DBF['HOST']=$(_xmlparse ${_configf} host)
+    DBF['NAME']=$(_xmlparse "${_configf}" dbname)
+    DBF['USER']=$(_xmlparse "${_configf}" username)
+    DBF['PASS']=$(_xmlparse "${_configf}" password)
+    DBF['HOST']=$(_xmlparse "${_configf}" host)
  fi
 fi
 }
