@@ -1,15 +1,6 @@
 #! /usr/bin/env bash
 ###Created by Abe k for MA to MA migrations##
-#
-# TODO
-# 1) Combine init/final functions #done
-# 2) Abstract sudo to a separate function #done
-# 3) Abstract ssh/rsync to separate functions ##not sure how to go about this
-# 4) Abstract xmllint to separate functions #done
-# 5) Use arrays for variable values #did on some
-# 6) Combine prints/echoes where possible #done
-# 7) Fix ssh/rsync flags. #done
-# 8) Reduce global variables by passing function parameters #done
+
 
 SCRIPT_VERSION='1.0'
 
