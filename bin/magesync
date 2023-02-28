@@ -1,7 +1,6 @@
 #! /usr/bin/env bash
 ###Created by Abe k for MA to MA migrations##
 
-
 SCRIPT_VERSION='1.0'
 
 # Script Arguments
@@ -46,9 +45,17 @@ Description: Run initial and finial sync for Magento
           -k|--key         Generate SSH Key
 EOF
 }
+
 _SUDO (){
 
   "${_sudo}" "$@"
+
+}
+
+_run_ssh(){
+
+    local _cmd=$1
+    ssh "${SSH_OPTS[@]}" "${_susr}"@"${_host}" "${_cmd}"
 
 }
 
@@ -188,12 +195,13 @@ _testssh () {
   if [[ -e ${tempath}/temp-MA.ed25519 ]]; then
     echo -e "${_green}Testing ssh connecting...${_nc}";
 #shellcheck disable=SC2029
-    ssh "${SSH_OPTS[@]}" "${_susr}"@"${_host}" "echo -e '${_green}ssh connection successful\n${_nc}'" 2> /dev/null;
+    _run_ssh "echo -e '${_green}ssh connection successful\n${_nc}'" 2> /dev/null;
     _lastcommand="$?";
 
   fi
   _sshchk
 }
+
 _sshchk(){
   local _sshchks
   if [ "${_lastcommand}" != 0 ]; then
@@ -227,13 +235,13 @@ _cleanup() {
 _stat_n_cat() {
   echo -e "${_green}Gathering Info..."
 #shellcheck disable=SC2029
-  if ! ssh "${SSH_OPTS[@]}" "${_susr}"@"${_host}" "stat ${_appdocroot}/app/etc/${_env}" > /dev/null; then
+  if ! _run_ssh "stat ${_appdocroot}/app/etc/${_env}" > /dev/null; then
     echo -e "${_red}Stat failed on config file, please make sure info was entered correctly${_nc}"
     exit 1
   fi
 
 #shellcheck disable=SC2029
- ssh "${SSH_OPTS[@]}" "${_susr}"@"${_host}" "cat ${_appdocroot}/app/etc/${_env}" > "${tempath}"/MA-dbinfo.txt
+ _run_ssh "cat ${_appdocroot}/app/etc/${_env}" > "${tempath}"/MA-dbinfo.txt
 
 }
 
@@ -300,7 +308,7 @@ _calculate_rsync() {
 
   echo "Calculating Size. Please wait..."
   #shellcheck disable=SC2029
-  _rsync_size=$(ssh "${SSH_OPTS[@]}" "${_susr}"@"${_host}" "find ${directory} | wc -l")
+  _rsync_size=$(_run_ssh "find ${directory} | wc -l")
 }
 
 #Rsync final and chown. If initial sync everything in the path given to ./ or if final, rsync whats in pub or media.
@@ -331,7 +339,7 @@ _dumpdb() {
   )
   _sqlfile="${DB['NAME']}-${_date}-MA.sql.gz"
   #shellcheck disable=SC2029
-  _dbdump=$(ssh "${SSH_OPTS[@]}" "${_susr}"@"${_host}" "mysqldump ${MYSQLDUMP_OPTS[*]}" | pv -W -b | gzip > "${tempath}"/"${_sqlfile}")
+  _dbdump=$(_run_ssh "mysqldump ${MYSQLDUMP_OPTS[*]}" | pv -W -b | gzip > "${tempath}"/"${_sqlfile}")
   echo -e "${_green}${_dbdump}${_nc}"
 }
 
@@ -371,7 +379,7 @@ _importdb() {
 _getphp() {
   echo -e "${_green}Checking PHP Version..."
 
-  _sourcephp=$(ssh "${SSH_OPTS[@]}" "${_susr}"@"${_host}" "php -v" | head -n1 | awk '{print $2}' | cut -d\. -f1-2 |  sed 's/\.//g')
+  _sourcephp=$(_run_ssh "php -v" | head -n1 | awk '{print $2}' | cut -d\. -f1-2 |  sed 's/\.//g')
   _targetphp=$(_SUDO grep source "${_usrpath}"/.bashrc | cut -d"/" -f4 | sed -r 's/php|u//g')
   _phpv=$(_SUDO grep source "${_usrpath}"/.bashrc | awk '{print $2}' | sed 's/enable/root\/usr\/bin\/php/g')
 }
