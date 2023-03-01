@@ -55,6 +55,7 @@ _SUDO (){
 _run_ssh(){
 
     local _cmd=$1
+#shellcheck disable=SC2029
     ssh "${SSH_OPTS[@]}" "${_susr}"@"${_host}" "${_cmd}"
 
 }
