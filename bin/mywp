@@ -1,4 +1,3 @@
-[akhalaf@mellon-login01 bin]$ cat mywp
 #!/usr/bin/env bash
 
 # Script Arguments
