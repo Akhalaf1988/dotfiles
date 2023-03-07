@@ -1,0 +1,258 @@
+[akhalaf@mellon-login01 bin]$ cat mywp
+#!/usr/bin/env bash
+
+# Script Arguments
+  readonly ARGS="$*"
+  readonly ARGA=("$@")
+
+# Alias executables to prevent PATH issues
+  readonly _wp="/usr/local/bin/wp";
+  readonly _phpv="/usr/bin/php74";
+  readonly _sudo="/usr/bin/sudo"
+
+#setting a variables to an empty value
+
+  add=""
+  remove=""
+  install=""
+  uninstall=""
+
+#Global Variables
+  _usr="$(pwd | grep -Po "/(chroot/)?home/\K[^/]*")";
+  _dom="$(pwd | grep -Po "/(chroot/)?home/${_usr}/\K[^/]*")";
+  _nxu="nxmigration"
+  _plugin="migrate-to-liquidweb"
+
+# Print usage
+_usage() {
+  cat <<- EOF
+Description: Install an Admin User and Blogvault for Migrations.
+Usage: bvinstall [flag]
+
+         Supported flags:
+
+          -a|--add-admin      Add admin
+          -h|--help           Display this message
+          -i|--install        Install BV
+          -d|--delete-admin   Delete admin
+          -u|--uninstall      Uninstall BV
+
+EOF
+}
+
+#runs sudo -u user path/to/php7 /path/to/wp cmd
+_sudo_php(){
+
+  "${_sudo}" -u "${_usr}" "${_phpv}" "${_wp}" "$@"
+
+}
+
+#args for wp commands
+_end_argsA=(
+
+  "--skip-plugins"
+  "--skip-themes"
+)
+_end_argsB=(
+
+  "--skip-plugins"
+  "--skip-themes"
+)
+
+#create admin, generate pass
+_admin_create(){
+
+  local _nxe _pass
+
+  _nxe="migrat@devnull.com"
+  _pass="$(shuf -er -n20  {A..Z} {a..z} {0..9} | tr -d '\n')"
+  _end_argsA+=("--user_pass=${_pass}")
+
+  if [[ -z "${_admincheck}" ]]; then
+    _end_argsA+=("--role=administrator")
+    echo "Creating Admin user";
+    _sudo_php user create "${_nxu}" "${_nxe}" "${_end_argsA[@]}";
+  else
+    echo "${_nxu} user found, resetting password";
+    _sudo_php user update "${_nxu}" "${_end_argsA[@]}";
+   unset _end_argsA[3]
+   echo "${_end_argsA[@]}"
+  fi;
+
+    echo "User: ${_nxu}";
+    echo "Pass: ${_pass}";
+}
+
+#remove migrations user
+_admin_remove(){
+
+  if [[ -n "${_admincheck}" ]]; then
+    _end_argsA+=(--yes)
+    echo "Removing Admin user";
+    _sudo_php user delete "${_nxu}" "${_end_argsA[@]}";
+  else
+    echo "${_nxu} user not found";
+  fi;
+
+}
+
+#install bv
+_bvinstall(){
+
+  if [[ -n "${_plugin_check}" && "${_bvactive}" == "active" ]]; then
+    echo "${_plugin} plugin detected";
+    echo "Status: installed/active";
+    echo "";
+  else
+    if [[ -n "${_plugin_check}" && "${_bvactive}" != "active" ]]; then
+      echo "${_plugin} plugin detected";
+      echo "Status: inactive..activating..";
+      _sudo_php plugin activate "${_plugin}" "${_end_argsB[@]}";
+      echo "";
+    else
+     _end_args+=("--activate")
+     _sudo_php plugin install "${_plugin}" "${_end_argsB[@]}";
+      echo "";
+    fi;
+  fi
+}
+
+#uninstall bv
+_bvuninstall(){
+
+  if [[ -n "${_plugin_check}" && "${_bvactive}" == "active" ]]; then
+    echo "Removing "${_plugin}" plugin";
+    _sudo_php plugin deactivate "${_plugin}" --uninstall "${end_argsB[@]}";
+  else
+    if [[ -n "${_plugin_check}" && "${_bvactive}" != "active" ]]; then
+      echo "Removing "${_plugin}" plugin";
+      _sudo_php plugin uninstall "${_plugin}" "${end_argsB[@]}";
+      echo "";
+    else
+      echo "No "${_plugin}" plugin found";
+    fi;
+  fi
+}
+
+
+# Convert long command line options into short ones for getopts
+_cmdline() {
+
+  local x;
+
+  for x in ${ARGA[*]}; do
+
+    case "$x" in
+      "--help"|"-h")
+        args="${args}-h "
+        ;;
+      "--admin"|"-a")
+        args="${args}-a "
+        ;;
+      "--install"|"-i")
+        args="${args}-i "
+        ;;
+      "--uninstall"|"-u")
+        args="${args}-u "
+        ;;
+      "--remove"|"-r")
+        args="${args}-r "
+        ;;
+      "--"*)
+        echo "$x is not a supported option." >&2
+        ;;
+      *)
+        args="${args}${x} "
+        ;;
+    esac
+  done
+
+  echo "$args";
+
+}
+
+# Main
+main () {
+
+  local cmdline;
+
+  mapfile -t cmdline < <(_cmdline | tr ' ' '\n');
+
+  while getopts ":hiaru" OPTION "${cmdline[@]}"; do
+
+    case $OPTION in
+      h)
+        _usage;
+        exit 0;
+        ;;
+      a)
+         add="yes"
+        ;;
+      i)
+         install="yes"
+        ;;
+      u)
+         uninstall="yes"
+        ;;
+      r)
+         remove="yes"
+        ;;
+      "?")
+        echo "-${OPTARG} is not a supported option." >&2
+        exit 1
+        ;;
+      *);;
+    esac
+  done
+
+#check to see if they added any argument
+  if [[ -z "${add}" && -z "${remove}" && -z "${install}" && -z "${uninstall}" ]]; then
+    echo "Requires an argument, --add --install, see --help"
+   exit 1
+  fi
+
+#vars needed for adding and removing bv/admin
+
+  _plugin_check=$(_sudo_php plugin list | grep  "${_plugin}");
+  _bvactive=$(echo "${_plugin_check}" | awk '{print $2}');
+  _admincheck="$(_sudo_php user list | grep ${_nxu})";
+
+#Do not allow add and remove to be used at the same time.
+
+  if [[ -n "${add}" && -n "${remove}" ]];then
+    echo "Unable to Add and Remove Admin"
+    exit 1
+  fi
+
+#Do not allow install and uninstall to run at the same time.
+
+  if [[ -n "${install}" && -n "${uninstall}" ]]; then
+    echo "Unable to Install and Uninstall BV"
+    exit 1
+  fi
+
+# if block to run commands
+
+  if [[ "${add}" == "yes" ]]; then
+    _admin_create;
+  fi
+
+  if [[ "${remove}" == "yes" ]]; then
+    _admin_remove
+  fi
+
+  if [[ "${install}" == "yes" ]]; then
+    _bvinstall;
+  fi
+
+  if [[ "${uninstall}" == "yes" ]]; then
+    _bvuninstall;
+  fi
+}
+
+  if [[ ! -e "$(pwd)/wp-config.php" ]]; then
+    echo "No Wordpress install in this location";
+    exit 1;
+  fi;
+
+main;
