@@ -74,9 +74,7 @@ _admin_create(){
   else
     echo "${_nxu} user found, resetting password";
     _sudo_php user update "${_nxu}" "${_end_argsA[@]}";
-   unset _end_argsA[3]
-   echo "${_end_argsA[@]}"
-  fi;
+]  fi;
 
     echo "User: ${_nxu}";
     echo "Pass: ${_pass}";
