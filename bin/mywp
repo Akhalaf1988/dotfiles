@@ -18,15 +18,16 @@
 _usage() {
   cat <<- EOF
 Description: Install an Admin User and Blogvault for Migrations.
-Usage: bvinstall -flag
+Usage: mywp -flag(s)
 
          Supported flags:
 
           -a|--add-admin      Add admin
-          -h|--help           Display this message
-          -i|--install        Install BV
           -d|--delete-admin   Delete admin
-          -u|--uninstall      Uninstall BV
+          -f|--flush-cache    Flush wp cache
+          -h|--help           Display this message
+          -i|--install        Install Blog Vault
+          -u|--uninstall      Uninstall Blog Vault
 
 EOF
 }
@@ -103,7 +104,8 @@ _bvinstall(){
     else
      _end_args+=("--activate")
      _sudo_php plugin install "${_plugin}" "${_end_args[@]}";
-      echo "";
+     unset '_end_args[2]'
+     echo "";
     fi;
   fi
 }
@@ -123,6 +125,13 @@ _bvuninstall(){
       echo "No ${_plugin} plugin found";
     fi;
   fi
+}
+
+##flush cache
+_flush_cache(){
+
+  _sudo_php cache flush "${_end_args[@]}";
+
 }
 
 
@@ -149,6 +158,9 @@ _cmdline() {
       "--remove"|"-r")
         args="${args}-r "
         ;;
+      "--flush-cache"|"-f")
+        args="${args}-f "
+        ;;
       "--"*)
         echo "$x is not a supported option." >&2
         ;;
@@ -167,6 +179,7 @@ main () {
 
   declare -A commands=(
 
+    ["flush_cache"]="_flush_cache"
     ["install"]="_bvinstall"
     ["uninstall"]="_bvuninstall"
     ["add"]="_admin_create"
@@ -177,7 +190,7 @@ main () {
 
   mapfile -t cmdline < <(_cmdline | tr ' ' '\n');
 
-  while getopts ":hiaru" OPTION "${cmdline[@]}"; do
+  while getopts ":hiaruf" OPTION "${cmdline[@]}"; do
 
     case $OPTION in
       h)
@@ -196,6 +209,9 @@ main () {
       r)
          remove="yes"
         ;;
+      f)
+         flush_cache="yes"
+        ;;
       "?")
         echo "-${OPTARG} is not a supported option." >&2
         exit 1
@@ -206,7 +222,7 @@ main () {
 
 #check to see if they added any argument
 
-if [[ -z "${add}${remove}${install}${uninstall}" ]]; then
+if [[ -z "${add}${remove}${install}${uninstall}${flush_cache}" ]]; then
     echo "Command requires an argument"
     echo ""
     _usage;
@@ -232,9 +248,7 @@ fi
     echo "Unable to Install and Uninstall BV"
     exit 1
   fi
-
 ##echo domain
-
   echo "${_dom}"
 
 # Loop through the commands and execute the corresponding function if its flag is set to "yes"
@@ -246,7 +260,6 @@ fi
   done
 
 }
-#check path
   if [[ ! -e "$(pwd)/wp-config.php" ]]; then
     echo "No Wordpress install in this location";
     exit 1;
