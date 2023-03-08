@@ -23,10 +23,10 @@ Usage: mywp -flag(s)
          Supported flags:
 
           -a|--add-admin      Add admin
-          -d|--delete-admin   Delete admin
           -f|--flush-cache    Flush wp cache
           -h|--help           Display this message
           -i|--install        Install BlogVault
+          -r|--remove-admin   Remove Admin
           -u|--uninstall      Uninstall BlogVault
 
 EOF
@@ -146,7 +146,7 @@ _cmdline() {
       "--help"|"-h")
         args="${args}-h "
         ;;
-      "--admin"|"-a")
+      "--add-admin"|"-a")
         args="${args}-a "
         ;;
       "--install"|"-i")
@@ -155,7 +155,7 @@ _cmdline() {
       "--uninstall"|"-u")
         args="${args}-u "
         ;;
-      "--remove"|"-r")
+      "--remove-admin"|"-r")
         args="${args}-r "
         ;;
       "--flush-cache"|"-f")
