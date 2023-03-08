@@ -9,13 +9,6 @@
   readonly _phpv="/usr/bin/php74";
   readonly _sudo="/usr/bin/sudo"
 
-#setting a variables to an empty value
-
-  add=""
-  remove=""
-  install=""
-  uninstall=""
-
 #Global Variables
   _usr="$(pwd | grep -Po "/(chroot/)?home/\K[^/]*")";
   _dom="$(pwd | grep -Po "/(chroot/)?home/${_usr}/\K[^/]*")";
@@ -26,7 +19,7 @@
 _usage() {
   cat <<- EOF
 Description: Install an Admin User and Blogvault for Migrations.
-Usage: bvinstall [flag]
+Usage: bvinstall -flag
 
          Supported flags:
 
@@ -74,7 +67,7 @@ _admin_create(){
   else
     echo "${_nxu} user found, resetting password";
     _sudo_php user update "${_nxu}" "${_end_argsA[@]}";
-]  fi;
+  fi;
 
     echo "User: ${_nxu}";
     echo "Pass: ${_pass}";
@@ -107,7 +100,7 @@ _bvinstall(){
       _sudo_php plugin activate "${_plugin}" "${_end_argsB[@]}";
       echo "";
     else
-     _end_args+=("--activate")
+     _end_argsB+=("--activate")
      _sudo_php plugin install "${_plugin}" "${_end_argsB[@]}";
       echo "";
     fi;
@@ -171,6 +164,14 @@ _cmdline() {
 # Main
 main () {
 
+  declare -A commands=(
+
+    ["install"]="_bvinstall"
+    ["uninstall"]="_bvuninstall"
+    ["add"]="_admin_create"
+    ["remove"]="_admin_remove"
+  )
+
   local cmdline;
 
   mapfile -t cmdline < <(_cmdline | tr ' ' '\n');
@@ -228,25 +229,15 @@ main () {
     exit 1
   fi
 
-# if block to run commands
+# Loop through the commands and execute the corresponding function if its flag is set to "yes"
+  for cmd in "${!commands[@]}"; do
+    if [[ "${!cmd}" == "yes" ]]; then
+      # call the corresponding function here
+      "${commands[$cmd]}"
+    fi
+  done
 
-  if [[ "${add}" == "yes" ]]; then
-    _admin_create;
-  fi
-
-  if [[ "${remove}" == "yes" ]]; then
-    _admin_remove
-  fi
-
-  if [[ "${install}" == "yes" ]]; then
-    _bvinstall;
-  fi
-
-  if [[ "${uninstall}" == "yes" ]]; then
-    _bvuninstall;
-  fi
 }
-
   if [[ ! -e "$(pwd)/wp-config.php" ]]; then
     echo "No Wordpress install in this location";
     exit 1;
