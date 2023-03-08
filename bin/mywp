@@ -205,10 +205,12 @@ main () {
   done
 
 #check to see if they added any argument
-  if [[ -z "${add}" && -z "${remove}" && -z "${install}" && -z "${uninstall}" ]]; then
-    echo "Requires an argument, --add --install, see --help"
-   exit 1
-  fi
+
+if [[ -z "${add}${remove}${install}${uninstall}" ]]; then
+    echo "Command Requires an argument"
+    _usage;
+    exit 1
+fi
 
 #vars needed for adding and removing bv/admin
 
