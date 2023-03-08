@@ -1,9 +1,6 @@
-#TODO
-##Combine end_args
 #!/usr/bin/env bash
 
 # Script Arguments
-  readonly ARGS="$*"
   readonly ARGA=("$@")
 
 # Alias executables to prevent PATH issues
@@ -42,12 +39,7 @@ _sudo_php(){
 }
 
 #args for wp commands
-_end_argsA=(
-
-  "--skip-plugins"
-  "--skip-themes"
-)
-_end_argsB=(
+_end_args=(
 
   "--skip-plugins"
   "--skip-themes"
@@ -60,30 +52,37 @@ _admin_create(){
 
   _nxe="migrat@devnull.com"
   _pass="$(shuf -er -n20  {A..Z} {a..z} {0..9} | tr -d '\n')"
-  _end_argsA+=("--user_pass=${_pass}")
+  _end_args+=("--user_pass=${_pass}")
 
   if [[ -z "${_admincheck}" ]]; then
-    _end_argsA+=("--role=administrator")
+    _end_args+=("--role=administrator")
     echo "Creating Admin user";
-    _sudo_php user create "${_nxu}" "${_nxe}" "${_end_argsA[@]}";
+    _sudo_php user create "${_nxu}" "${_nxe}" "${_end_args[@]}";
+    unset '_end_args[3]'
   else
     echo "${_nxu} user found, resetting password";
-    _sudo_php user update "${_nxu}" "${_end_argsA[@]}";
+    _sudo_php user update "${_nxu}" "${_end_args[@]}";
   fi;
 
-    echo "User: ${_nxu}";
-    echo "Pass: ${_pass}";
+  echo "User: ${_nxu}";
+  echo "Pass: ${_pass}";
+  echo "";
+
+  unset '_end_args[2]'
 }
 
 #remove migrations user
 _admin_remove(){
 
   if [[ -n "${_admincheck}" ]]; then
-    _end_argsA+=(--yes)
+    _end_args+=(--yes)
     echo "Removing Admin user";
-    _sudo_php user delete "${_nxu}" "${_end_argsA[@]}";
+    _sudo_php user delete "${_nxu}" "${_end_args[@]}";
+    echo "";
+    unset '_end_args[2]';
   else
     echo "${_nxu} user not found";
+    echo "";
   fi;
 
 }
@@ -99,11 +98,11 @@ _bvinstall(){
     if [[ -n "${_plugin_check}" && "${_bvactive}" != "active" ]]; then
       echo "${_plugin} plugin detected";
       echo "Status: inactive..activating..";
-      _sudo_php plugin activate "${_plugin}" "${_end_argsB[@]}";
+      _sudo_php plugin activate "${_plugin}" "${_end_args[@]}";
       echo "";
     else
-     _end_argsB+=("--activate")
-     _sudo_php plugin install "${_plugin}" "${_end_argsB[@]}";
+     _end_args+=("--activate")
+     _sudo_php plugin install "${_plugin}" "${_end_args[@]}";
       echo "";
     fi;
   fi
@@ -113,15 +112,15 @@ _bvinstall(){
 _bvuninstall(){
 
   if [[ -n "${_plugin_check}" && "${_bvactive}" == "active" ]]; then
-    echo "Removing "${_plugin}" plugin";
-    _sudo_php plugin deactivate "${_plugin}" --uninstall "${end_argsB[@]}";
+    echo "Removing ${_plugin} plugin";
+    _sudo_php plugin deactivate "${_plugin}" --uninstall "${_end_args[@]}";
   else
     if [[ -n "${_plugin_check}" && "${_bvactive}" != "active" ]]; then
-      echo "Removing "${_plugin}" plugin";
-      _sudo_php plugin uninstall "${_plugin}" "${end_argsB[@]}";
+      echo "Removing ${_plugin} plugin";
+      _sudo_php plugin uninstall "${_plugin}" "${_end_args[@]}";
       echo "";
     else
-      echo "No "${_plugin}" plugin found";
+      echo "No ${_plugin} plugin found";
     fi;
   fi
 }
@@ -132,7 +131,7 @@ _cmdline() {
 
   local x;
 
-  for x in ${ARGA[*]}; do
+  for x in "${ARGA[@]}"; do
 
     case "$x" in
       "--help"|"-h")
