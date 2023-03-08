@@ -26,8 +26,8 @@ Usage: mywp -flag(s)
           -d|--delete-admin   Delete admin
           -f|--flush-cache    Flush wp cache
           -h|--help           Display this message
-          -i|--install        Install Blog Vault
-          -u|--uninstall      Uninstall Blog Vault
+          -i|--install        Install BlogVault
+          -u|--uninstall      Uninstall BlogVault
 
 EOF
 }
