@@ -207,9 +207,10 @@ main () {
 #check to see if they added any argument
 
 if [[ -z "${add}${remove}${install}${uninstall}" ]]; then
-    echo "Command Requires an argument"
+    echo "Command requires an argument"
+    echo ""
     _usage;
-    exit 1
+    exit 1;
 fi
 
 #vars needed for adding and removing bv/admin
@@ -232,6 +233,10 @@ fi
     exit 1
   fi
 
+##echo domain
+
+  echo "${_dom}"
+
 # Loop through the commands and execute the corresponding function if its flag is set to "yes"
   for cmd in "${!commands[@]}"; do
     if [[ "${!cmd}" == "yes" ]]; then
@@ -241,6 +246,7 @@ fi
   done
 
 }
+#check path
   if [[ ! -e "$(pwd)/wp-config.php" ]]; then
     echo "No Wordpress install in this location";
     exit 1;
