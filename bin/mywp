@@ -130,7 +130,11 @@ _bvuninstall(){
 ##flush cache
 _flush_cache(){
 
-  _sudo_php cache flush "${_end_args[@]}";
+if _sudo_php nxmapps cache flush --all 2> /dev/null; then
+  exit 0
+else
+  _sudo_php cache flush "${_end_args[@]}"
+fi
 
 }
 
