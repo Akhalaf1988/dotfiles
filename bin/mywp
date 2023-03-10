@@ -65,7 +65,7 @@ _admin_create(){
 
   local _nxe _pass
 
-  _nxe="migrat@devnull.com"
+  _nxe="migrations@liquidweb.com"
   _pass="$(shuf -er -n20  {A..Z} {a..z} {0..9} | tr -d '\n')"
   _end_args+=("--user_pass=${_pass}")
 
