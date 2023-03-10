@@ -27,7 +27,7 @@ Usage: mywp -flag(s)
           -h|--help           Display this message
           -i|--install        Install Blog Vault
           -r|--remove-admin   Remove admin
-          -s|--search         Search-replace #Requires a url as an addition option
+          -s|--search         Search-replace #Requires a url as an additional option
           -u|--uninstall      Uninstall Blog Vault
 
 
