@@ -149,12 +149,7 @@ _search_replace(){
 
     _hostname="$(_normalizedomain "${_url}")";
     _home_url="$(_sudo_php option get home "${_end_args[@]}" | awk -F '://' '{print $2}')"
-    _end_args+=(
-
-    "--all-tables"
-    "--recurse-objects"
-    "--skip-columns=user_email"
-  )
+  
     _sudo_php search-replace "://${_home_url}" "://${_hostname}" "${_end_args[@]}"
 
 }
