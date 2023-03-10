@@ -25,9 +25,11 @@ Usage: mywp -flag(s)
           -a|--add-admin      Add admin
           -f|--flush-cache    Flush wp cache
           -h|--help           Display this message
-          -i|--install        Install BlogVault
-          -r|--remove-admin   Remove Admin
-          -u|--uninstall      Uninstall BlogVault
+          -i|--install        Install Blog Vault
+          -r|--remove-admin   Remove admin
+          -s|--search         Search-replace #Requires a url as an addition option
+          -u|--uninstall      Uninstall Blog Vault
+
 
 EOF
 }
@@ -36,6 +38,18 @@ EOF
 _sudo_php(){
 
   "${_sudo}" -u "${_usr}" "${_phpv}" "${_wp}" "$@"
+
+}
+
+_normalizedomain (){
+
+SEDOPTS=(
+
+   -e 's/https?:\/\///'
+   -e 's/\/.*//'
+   -e 's,\.$,,'
+  )
+echo "$1" | sed -r "${SEDOPTS[@]}" | tr '[:upper:]' '[:lower:]'
 
 }
 
@@ -127,10 +141,30 @@ _bvuninstall(){
   fi
 }
 
+##search and replace ##check for home url and replace with arg
+
+_search_replace(){
+
+  local _home_url _hostname
+
+    _hostname="$(_normalizedomain "${_url}")";
+    _home_url="$(_sudo_php option get home "${_end_args[@]}" | awk -F '://' '{print $2}')"
+    _end_args+=(
+
+    "--all-tables"
+    "--recurse-objects"
+    "--skip-columns=user_email"
+  )
+    _sudo_php search-replace "://${_home_url}" "://${_hostname}" "${_end_args[@]}"
+
+}
+
 ##flush cache
 _flush_cache(){
 
-if _sudo_php nxmapps cache flush --all 2> /dev/null; then
+
+
+if _sudo_php nxmapps cache flush --all "${_end_args[@]}" 2> /dev/null; then
   exit 0
 else
   _sudo_php cache flush "${_end_args[@]}"
@@ -165,6 +199,9 @@ _cmdline() {
       "--flush-cache"|"-f")
         args="${args}-f "
         ;;
+      "--search"|"-s")
+        args="${args}-s "
+        ;;
       "--"*)
         echo "$x is not a supported option." >&2
         ;;
@@ -183,18 +220,20 @@ main () {
 
   declare -A commands=(
 
-    ["flush_cache"]="_flush_cache"
+    ["flush"]="_flush_cache"
     ["install"]="_bvinstall"
     ["uninstall"]="_bvuninstall"
+    ["search"]="_search_replace"
     ["add"]="_admin_create"
     ["remove"]="_admin_remove"
+
   )
 
   local cmdline;
 
   mapfile -t cmdline < <(_cmdline | tr ' ' '\n');
 
-  while getopts ":hiaruf" OPTION "${cmdline[@]}"; do
+  while getopts ":hiarufs:" OPTION "${cmdline[@]}"; do
 
     case $OPTION in
       h)
@@ -214,7 +253,17 @@ main () {
          remove="yes"
         ;;
       f)
-         flush_cache="yes"
+         flush="yes"
+        ;;
+      s)
+      if [[ "$OPTARG" =~ ^-.* || "$OPTARG" == "" ]]; then
+        # if the argument for -s starts with a dash or is empty, it is not a valid argument
+        echo "-s requires a url as an option" >&2
+        exit 1
+      else
+        _url="$OPTARG"
+        search="yes"
+      fi
         ;;
       "?")
         echo "-${OPTARG} is not a supported option." >&2
@@ -226,12 +275,12 @@ main () {
 
 #check to see if they added any argument
 
-if [[ -z "${add}${remove}${install}${uninstall}${flush_cache}" ]]; then
+  if [[ -z "${search}${add}${remove}${install}${uninstall}${flush}" ]]; then
     echo "Command requires an argument"
     echo ""
     _usage;
     exit 1;
-fi
+  fi
 
 #vars needed for adding and removing bv/admin
 
@@ -252,6 +301,7 @@ fi
     echo "Unable to Install and Uninstall BV"
     exit 1
   fi
+
 ##echo domain
   echo "${_dom}"
 
