@@ -1,0 +1,123 @@
+#!/usr/bin/env python3
+import argparse
+import os
+import requests
+import time
+
+#GTmetrix API Info
+API_KEY = os.getenv('GTtoken')
+API_URL = "https://gtmetrix.com/api/2.0"
+
+#run a scan on domian
+def run_scan(domain):
+    #build the request
+    test_data = {
+        "data": {
+            "type": "test",
+            "attributes": {
+                "url": domain,
+                "location": 4,
+                "browser":  3,
+                "adblock": 1,
+            },
+        },
+    }
+    #POST Request that kicks off scan
+    response = requests.post(
+        f"{API_URL}/tests",
+        auth=(API_KEY, ""),
+        headers={"Content-Type": "application/vnd.api+json"},
+        json=test_data,
+    )
+    try:
+       #response does not contain data if the scan fails so we need a try block
+       response_data = response.json()["data"]["attributes"]
+       state = response_data["state"]
+       if state == "error":
+           error = response_data["error"]
+           print(f"Scan failed {error}")
+       else:
+           test_id = response.json()["data"]["id"]
+           print(f"Scan started for {domain}, id: {test_id}")
+           Check_status(response,test_id,state,domain)
+    except KeyError:
+        print(f"Scan Failed for domain {domain}")
+
+def Check_status(response,test_id,state,domain):
+    #loop to check the status and state of the request.
+    while True:
+        try:
+            state = response.json()["data"]["attributes"]["state"]
+        except KeyError:
+            # The response body has changed, so we need to make the request again
+            response = requests.get(
+                f"{API_URL}/tests/{test_id}",
+                auth=(API_KEY, ""),
+            )
+            #get the report id 
+            report_id = response.json()["data"]["id"] #
+            gen_report(report_id,domain)
+            break
+
+        if response.status_code == 202:
+            print("Scan has been queued")
+            time.sleep(7)
+            response = requests.get(
+                f"{API_URL}/tests/{test_id}",
+                auth=(API_KEY, ""),
+            )
+        elif response.status_code == 200 and state == "started":
+            print(f"Scan is in progress: {state}")
+            time.sleep(15)
+            response = requests.get(
+                f"{API_URL}/tests/{test_id}",
+                auth=(API_KEY, ""),
+            )
+        else:
+            if state == "error":
+                error = response.json()["data"]["attributes"]["error"]
+                print(f"Scan failed: {state}")
+                print(f"Error: {error}")
+                break
+
+def gen_report(report_id,domain):
+    
+    print(f"\nScan complete for {domain}")
+    print(f"Scan report: https://gtmetrix.com/reports/{domain}/{report_id}")
+    report_url = f"{API_URL}/reports/{report_id}"
+    #new request to get the report
+    report_response = requests.get(
+        report_url,
+        auth=(API_KEY, ""),
+    )
+    #Generate stats
+    load_time = report_response.json()["data"]["attributes"]["fully_loaded_time"]
+    load_time_seconds = load_time  / 1000
+    print(f"Full load time: {load_time_seconds}s")
+
+def main():
+    parser = argparse.ArgumentParser()
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-d", "--domain", help="domain to scan")
+    group.add_argument("-f", "--file", help="file containing list of domains to scan")
+    args = parser.parse_args()
+
+    if args.domain:
+        run_scan(args.domain)
+    elif args.file:
+        if not os.path.exists(args.file):
+            print(f"File '{args.file}' not found.")
+            return
+        if not os.path.isfile(args.file):
+            print(f"'{args.file}' is not a file.")
+            return
+        with open(args.file, "r") as f:
+            domains = f.read().splitlines()
+        if not domains:
+            print(f"File '{args.file}' is empty.")
+            return
+        for domain in domains:
+            run_scan(domain)
+
+if __name__ == "__main__":
+    main()
