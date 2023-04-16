@@ -105,7 +105,7 @@ check_install_version (){
 
   magento_ops=$(sudo_php "${phpv_path}" "${magento_path}" setup:install -h | grep "\-\-elastics")
 
-# If magento_options gives an empty value then this install is nto bin/magento compat
+# If magento_options gives an empty value then this install is not bin/magento compatible
 
   if [[ -z "${magento_ops}" ]]; then
       printf "%s\nThis Version ${magento_version} does not have /bin/magento support for ES\n"
