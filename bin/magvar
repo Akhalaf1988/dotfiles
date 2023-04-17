@@ -261,6 +261,7 @@ _get_container_info(){
   if [[ -z "${host}" ]]; then
      printf "done\n"
      printf "Varnish Container is not Enabled!\n";
+     exit 1
   else
      printf "done\n"
      port_selector='.[] | select(.type.identity | contains("varnish")) | .ports[0].publish_port'
