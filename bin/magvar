@@ -83,7 +83,7 @@ purge_varnish(){
 
   use_paths=false
 
-#s Send a curl request to purge the cache
+# Send a curl request to purge the cache
 
   sudo_php curl -s "${host}:${port}" "${varnish_headers[@]}"
   printf "done\n"
@@ -129,6 +129,8 @@ install(){
   printf "Varnish info:\n\n"
   printf "%s  Host: ${host}\n"
   printf "%s  Port: ${port}\n"
+
+# If an api-token is available print extra info
 
   if [[ -n "${NWTOKEN}" ]]; then
       varnish_stat
