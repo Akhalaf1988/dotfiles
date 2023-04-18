@@ -28,7 +28,7 @@ sudo_php(){
 
 # Check which version of sudo to use.
 
-  if [ "$use_paths" = true ]; then
+  if [[ "$use_paths" = true ]]; then
     # run sudo -u user with the args passed and the paths
     sudo -u "${user}" "${phpv_path}" "${magento_path}" "$@"
   else
@@ -191,10 +191,10 @@ check_install_path(){
 
 # check default path, if it does not exist check parent directory
 
-  if [ ! -e "${magento_path}" ]; then
+  if [[ ! -e "${magento_path}" ]]; then
       magento_path="../bin/magento"
   fi
-  if [ ! -e "${magento_path}" ]; then
+  if [[ ! -e "${magento_path}" ]]; then
       echo "Error: bin/magento not found in the current or parent directory."
   fi
 
@@ -220,7 +220,7 @@ _check_status(){
   response=$(sudo_php curl -s -o /dev/null -w "%{http_code}" http://"${host}":"${port}")
 
   # If the response is 200, run the install function
-  if [ "${response}" -eq 200 ]; then
+  if [[ "${response}" -eq 200 ]]; then
     printf "done\n"
   else
     printf "done\n"
@@ -308,7 +308,7 @@ check_api(){
   resp=$(curl --silent "${api_url}/${container_endpoint}" "${headers[@]}");
 
 # Check if the response code is not 200
-  if [ "${resp}" -ne 200 ]; then
+  if [[ "${resp}" -ne 200 ]]; then
      printf "done\n"
      printf "%skey not valid ${resp}\n";
 # Go to function that asks for this info
@@ -429,7 +429,7 @@ fi
 
 # If API-KEY is empty get host info else
 # Check the API-KEY for a 200 response
-  if [ -z "${NWTOKEN}" ]; then
+  if [[ -z "${NWTOKEN}" ]]; then
     get_host;
   else
 # Check the API-KEY for a 200 response
