@@ -37,6 +37,8 @@ sudo_php(){
 
 }
 
+# This is needed bcause the base url looks like https://domain.com/ and we need to undo all the slashes
+
 _normalizedomain (){
 
 # Set up sedopts
