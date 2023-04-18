@@ -26,20 +26,20 @@ EOF
 
 sudo_php(){
 
-# Check which version of sudo to use.
+# use_paths is a boolan value.
+# if set to true, run the top command, less the bottom
 
   if [ "$use_paths" = true ]; then
-    # run sudo -u user with the args passed and the paths
     sudo -u "${user}" "${phpv_path}" "${magento_path}" "$@"
   else
-    # run sudo -u user with the args passed, but without the paths
     sudo -u "${user}" "$@"
   fi
 
 }
 
-# Take away and forward slash or http(s)"//
 _normalizedomain (){
+
+# Set up sedopts
 
 SEDOPTS=(
 
@@ -47,14 +47,19 @@ SEDOPTS=(
    -e 's/\/.*//'
    -e 's,\.$,,'
   )
-echo "$1" | sed -r "${SEDOPTS[@]}" | tr '[:upper:]' '[:lower:]'
+  
+# echo the domain with the sedopts
+
+  echo "$1" | sed -r "${SEDOPTS[@]}" | tr '[:upper:]' '[:lower:]'
 
 }
 
 varnish_stat(){
 
 # Define local variables
+
   local addon_selector addon_uri _addon_curl name_conf v_curl
+
 # Set vars for addon info
 
   addon_selector='.[] | select(.type.identity | contains("varnish"))| .addon.metadata.uri'
@@ -62,9 +67,11 @@ varnish_stat(){
 # Get the addon endpoint
 
   addon_uri=$(echo "${_curl}" | jq -r "${addon_selector}")
+
 # Build the new Curl request for addon info
 
   _addon_curl=$(curl -s "${api_url}/${acc_id}${addon_uri}" "${headers[@]}");
+
 # build the varnish curl
 
   name_conf='{name, configuration}'
@@ -78,7 +85,10 @@ varnish_stat(){
 
 purge_varnish(){
 
+# Define local variables
+
   local varnish_headers
+
   printf "Flushing Varnish cache..."
 
 # Set new headers for curl
@@ -96,10 +106,11 @@ purge_varnish(){
 
   use_paths=false
 
-#s Send a curl request to purge the cache
+# Send a curl request to purge the cache
 
   sudo_php curl -s "${host}:${port}" "${varnish_headers[@]}"
   printf "done\n"
+
 }
 
 varnish_domain_map(){
@@ -109,6 +120,7 @@ varnish_domain_map(){
   local base_url domain vardommap_temp vardommap_base
 
   printf "Checking varnish domain map..."
+
 # Set base url info
 
   base_url=$(sudo_php config:show | grep base_url | awk '{print $3}')
@@ -116,7 +128,8 @@ varnish_domain_map(){
   vardommap_temp=$(grep "${dom}" /etc/nginx/conf.d/varnish-domainmap.conf)
   vardommap_base=$(grep "${domain}" /etc/nginx/conf.d/varnish-domainmap.conf)
 
-# Check if domains are added to the map
+# Check if temp or base url get an empty value. 
+# If empty enable varnish secondary domains.
 
   if [[ -z "${vardommap_temp}" ]]; then
       printf "done\n"
@@ -187,6 +200,7 @@ install(){
 check_cache_app (){
 
 # Define local variables
+
   local cache_app_num
 
 # use_paths is a boolan value used in sudo_php function
@@ -225,7 +239,9 @@ fi
 check_install_path(){
 
 # Needed to check where bin/magento is installed
+
   printf "Checking path..."
+
 # Set php version to use for install
 
   phpv=$(echo "${siteworx}" | grep "SITEWORX_PHP_VERSION" | awk '{print $2}' | cut -d/ -f4);
@@ -247,6 +263,8 @@ check_install_path(){
 
 # Check value of caching app
   printf "done\n"
+
+# Check if cache app is set to 1.
   check_cache_app
 
 }
@@ -254,6 +272,7 @@ check_install_path(){
 _check_status(){
 
 # Declare local variables
+
   local response
 
 # use_paths is a boolan value used in sudo_php function
@@ -263,11 +282,13 @@ _check_status(){
 
   printf "Checking Varnish containter status..."
 
-  # Make a curl request to the provided host and port
+# Make a curl request to the provided host and port
+ 
   response=$(sudo_php curl -s -o /dev/null -w "%{http_code}" http://"${host}":"${port}")
 
-  # If the response is 200, run the install function
-  if [ "${response}" -eq 200 ]; then
+# If the response is 200, run the install function
+ 
+   if [ "${response}" -eq 200 ]; then
     printf "done\n"
   else
     printf "done\n"
@@ -287,6 +308,7 @@ _check_status(){
 _get_container_info(){
 
 # Declare local variables
+
   local port_selector
 
 # Remove some of the args from the headers
@@ -304,6 +326,7 @@ _get_container_info(){
   host=$(echo "${_curl}" | jq -r '.[].identity' | grep -i varnis);
 
 # Check for an empty response on varnish info and set variables if not
+
   if [[ -z "${host}" ]]; then
      printf "done\n"
      printf "Varnish Container is not Enabled!\n";
@@ -331,9 +354,11 @@ _get_container_info(){
 check_api(){
 
 # Declare local variables
+
   local resp
 
 # Extract site ID and account ID from siteworx data
+
   site_id=$(echo "${siteworx}" | grep 'account_id' | awk '{print $2}');
   acc_id=$(echo "${siteworx}" | grep '^client_id' | awk '{print $2}');
 
@@ -347,21 +372,24 @@ check_api(){
   )
 
 # Set API URL
+
   api_url='https://nocworx.nexcess.net/api/v1/as-client'
   container_endpoint="${acc_id}/v1/site/${site_id}/container"
-# Send curl to check api response
 
   printf "\nChecking api-key..."
+
+# Send curl to check api response
+
   resp=$(curl --silent "${api_url}/${container_endpoint}" "${headers[@]}");
 
-# Check if the response code is not 200
+# Check reponse code. If not 200 get host and port info
+# Else try to get the container info
+
   if [ "${resp}" -ne 200 ]; then
      printf "done\n"
      printf "%skey not valid ${resp}\n";
-# Go to function that asks for this info
      get_host;
   else
-# Check the container for varnish value
      printf "done\n"
      _get_container_info;
   fi
@@ -371,10 +399,12 @@ check_api(){
 get_host(){
 
 # prompt for host, port and prefix info
+
   read -r -p "Enter Hostname: " host
   read -r -p "Enter Port: " port
 
 # Reprompt if any of the values are still empty
+
   while true; do
 # Check if all variables are set
     if [[ -n "${host:-}" && -n "${port:-}" ]]; then
@@ -388,11 +418,13 @@ get_host(){
   done
 
 # Once set, with the info they provided use _check_status function to verify it is enabled.
+  
   _check_status;
 
 }
 
 # Convert long command line options into short ones for getopts
+
 _cmdline() {
 
   local x;
@@ -422,6 +454,7 @@ _cmdline() {
 
 }
 
+# the main fuction to kick us off.
 
 main(){
 
