@@ -2,29 +2,67 @@
 
 # Script Arguments
   ARGA=("$@")
-  API=""
 
 # Print help
 _usage() {
   cat <<- EOF
 
 Description: Install Elastic-Search on Cloudhost servers
+If NWTOKEN is set as an ENV var it will auto install.
+
 Use: mages
 
    Optional Argument:
 
-     -a|--api   Promts For An Api-Token To Use For Install
+     -h|--help     Display this message
+     -i|--info     Display Varnish info from portal. requires an NWTOKEN
 
 EOF
 }
 
 sudo_php(){
 
-# run sudo -u user with the args passes.
+# use_paths is a boolan value
+# If set to true include path/to/php bin/magento
+# If not it will exclude those two fields
 
-  sudo -u "${user}" "$@"
+  if [[ "$use_paths" = true ]]; then
+     sudo -u "${user}" "${phpv_path}" "${magento_path}" "$@"
+  else
+     sudo -u "${user}" "$@"
+  fi
 
 }
+
+elastic_stat(){
+
+# Define local variables
+  local addon_selector addon_uri _addon_curl name_conf v_curl
+# Set vars for addon info
+
+  addon_selector='.[] | select(.type.identity | contains("elastic"))| .addon.metadata.uri'
+
+# Get the addon endpoint
+
+  addon_uri=$(echo "${_curl}" | jq -r "${addon_selector}")
+
+# Build the new Curl request for addon info
+
+  _addon_curl=$(curl -s "${api_url}/${acc_id}${addon_uri}" "${headers[@]}");
+
+# build the elastic curl
+
+  name_conf='{name, configuration}'
+  e_curl=$(echo "${_addon_curl}" | jq -r "${name_conf}" | tr -d '",{}')
+
+# Print varnish stats
+
+  printf "%s${e_curl}\n"
+
+
+
+}
+
 
 esinfo(){
 
@@ -37,6 +75,11 @@ esinfo(){
   printf "%s  Es Version: ${version_unmod}\n"
   printf "%s  Prefix: ${prefix}\n"
   printf "\n"
+
+  if [[ -n "${NWTOKEN}" ]]; then
+      elastic_stat
+  fi
+
 }
 
 install(){
@@ -62,18 +105,19 @@ install(){
 
 # Actually do the install
 
-  sudo_php "${phpv_path}" "${magento_path}" setup:install "${ES_ARGS[@]}"
+  sudo_php setup:install "${ES_ARGS[@]}"
 
 # Reindex site
 
   printf "\n\nReindexing catalogsearch_fulltext...please wait\n"
-  sudo_php "${phpv_path}" "${magento_path}" indexer:reindex catalogsearch_fulltext
+  sudo_php indexer:reindex catalogsearch_fulltext
 
 
 # Flush magento cache
 
-  printf "\nFlushing Magento cache...\n"
-  sudo_php "${phpv_path}" "${magento_path}" c:f
+  printf "\nFlushing Magento cache..."
+  sudo_php cache:flush -q
+  printf "done\n"
 
 # Display ES info
 
@@ -87,31 +131,40 @@ check_install_version (){
 # Define local variables
   local magento_ops magento_version
 
+# use_paths is a boolan value used in sudo_php function
+# If set to true include path/to/php bin/magento
+
+  use_paths=true
+
 # We need to check the magento version, not all versions can be installed through bin/magento
 # For those that can not, we will just spit out ES info
 
+  printf "Checking magento version..."
 # Get Magento version
 
-  magento_version=$(sudo_php "${phpv_path}" "${magento_path}" --version | awk '{print $3}'| awk -F '-' '{print $1}');
+  magento_version=$(sudo_php --version | awk '{print $3}'| awk -F '-' '{print $1}');
 
 # Check if version is compatible with Elasticsearch
 
   if [[ "${magento_version}" < "2.3.1" ]]; then
+      printf "done\n"
       echo "Magento version ${magento_version} is too low for Elasticsearch.";
       exit 1;
   fi
 
 # Check for setup:install --elastic options
 
-  magento_ops=$(sudo_php "${phpv_path}" "${magento_path}" setup:install -h | grep "\-\-elastics")
+  magento_ops=$(sudo_php setup:install -h | grep "\-\-elastics")
 
-# If magento_options gives an empty value then this install is not bin/magento compatible
+# If magento_options gives an empty value then this install is nto bin/magento compat
 
   if [[ -z "${magento_ops}" ]]; then
+      printf "done\n"
       printf "%s\nThis Version ${magento_version} does not have /bin/magento support for ES\n"
       printf "You should just need to update the app/etc/env.php file\n"
       esinfo
   else
+      printf "done\n"
 # All checks pass so lets proceed to the install.
       install
   fi
@@ -120,7 +173,7 @@ check_install_version (){
 check_install_path(){
 
 # Needed to check where bin/magento is installed
-
+  printf "Checking path..."
 # Set php version to use for install
 
   phpv=$(echo "${siteworx}" | grep "SITEWORX_PHP_VERSION" | awk '{print $2}' | cut -d/ -f4);
@@ -132,13 +185,14 @@ check_install_path(){
 
 # check default path, if it does not exist check parent directory
 
-  if [ ! -e "${magento_path}" ]; then
+  if [[ ! -e "${magento_path}" ]]; then
       magento_path="../bin/magento"
   fi
-  if [ ! -e "${magento_path}" ]; then
+  if [[ ! -e "${magento_path}" ]]; then
+      printf "done\n"
       echo "Error: bin/magento not found in the current or parent directory."
   fi
-
+  printf "done\n"
 # Check what version of magento we are working with
 
   check_install_version
@@ -150,16 +204,33 @@ _check_status(){
 # Declare local variables
   local response
 
+printf "Checking Elastic containter status..."
+
+# use_paths is a boolan value used in sudo_php function
+# If set to true include path/to/php bin/magento
+
+  use_paths=false
+
   # Make a curl request to the provided host and port
 
-  response=$(sudo_php curl -s -o /dev/null -w "%{http_code}" http://"${host}":"${port}")
+  response=$(sudo_php curl -s -o /dev/null -w "%{http_code}" http://"${host}:${port}")
 
   # If the response is 200, run the install function
-  if [ "${response}" -eq 200 ]; then
-    check_install_path;
+  if [[ "${response}" -eq 200 ]]; then
+    printf "done\n"
   else
+    printf "done\n"
     printf "%sError: HTTP response code was not 200 ${response}\n"
   fi
+
+# Check if -i was passed
+
+  if [[ "${PRINT_INFO}" == "YES" ]]; then
+     elastic_stat;
+  else
+     check_install_path;
+  fi
+
 }
 
 _get_container_info(){
@@ -176,28 +247,42 @@ _get_container_info(){
 # filter the response with jq to extract the 'identity' field,and grep for the keyword 'elast' to filter for ElasticSearch hosts.
 # Set the resulting host value to the 'host' variable.
 
+  printf "Grabbing Varnish info from Portal..."
   _curl=$(curl -s "${api_url}/${acc_id}/v1/site/${site_id}/container" "${headers[@]}");
   host=$(echo "${_curl}" | jq -r '.[].identity' | grep -i elast);
 
 # Check for an empty response on ES info and set variables if not
-  if [[ -z "${host}" ]]; then
-     printf "Elastic-Search is not installed\n";
-  else
 
-# Parse the API response using jq to extract the publish port and version number
+# Else Parse the API response using jq to extract the publish port and version number
 # for the ElasticSearch container that matches the keyword 'elast' in the 'identity' field.
 # The extracted port and version values are then stored in the 'port' and 'version' variables,
 # respectively. Finally, append '.nxcli.net' to the host value, and call the 'check_install'
 # function to verify the magento installation path.
-
-  port_selector='.[] | select(.type.identity == "elasticsearch") | .ports[0].publish_port'
-  port=$(echo "${_curl}" | jq -r "${port_selector}");
-  version_selector='.[] | select(.type.identity == "elasticsearch") | .version'
-  version_unmod=$(echo "${_curl}" | jq -r "${version_selector}");
-  version=$(echo "${version_unmod}"| cut -d\. -f1);
-  host="${host}.nxcli.net"
-  check_install_path;
+  if [[ -z "${host}" ]]; then
+     printf "done\n"
+     printf "Elastic-Search container is not Enabled!\n";
+  else
+     printf "done\n"
+     port_selector='.[] | select(.type.identity == "elasticsearch") | .ports[0].publish_port'
+     port=$(echo "${_curl}" | jq -r "${port_selector}");
+     version_selector='.[] | select(.type.identity == "elasticsearch") | .version'
+     version_unmod=$(echo "${_curl}" | jq -r "${version_selector}");
+     version=$(echo "${version_unmod}"| cut -d\. -f1);
+     host="${host}.nxcli.net"
   fi
+
+# Check if -i was passed
+
+  if [[ "${PRINT_INFO}" == "YES" ]]; then
+     printf "\n"
+     printf "Elastic-Search Info:\n\n"
+     printf "%s  Host: ${host}\n"
+     printf "%s  Port: ${port}\n"
+     elastic_stat;
+  else
+     check_install_path;
+  fi
+
 }
 
 check_api(){
@@ -212,16 +297,28 @@ check_api(){
 # Set API URL
   api_url='https://nocworx.nexcess.net/api/v1/as-client'
 
+# Set the headers for the request
+
+  headers=(
+    -H "Authorization: Bearer ${NWTOKEN}"
+    -H "Accept: application/json"
+    -w "%{http_code}"
+    -o "/dev/null"
+  )
+
+  printf "\nChecking api-key..."
 # Send curl
   resp=$(curl --silent "${api_url}/${acc_id}/v1/site/${site_id}/container" "${headers[@]}");
 
 # Check if the response code is not 200
-  if [ "${resp}" -ne 200 ]; then
+  if [[ "${resp}" -ne 200 ]]; then
+     printf "done\n"
      printf "%skey not valid ${resp}\n";
 # Go to function that asks for this info
      get_host;
   else
 # Check the container for ES value
+     printf "done\n"
      _get_container_info;
   fi
 
@@ -263,11 +360,11 @@ _cmdline() {
   for x in "${ARGA[@]}"; do
 
     case "$x" in
-     "--api"|"-a")
-        args="${args}-a "
-        ;;
      "--help"|"-h")
         args="${args}-h "
+        ;;
+     "--info"|"-i")
+        args="${args}-i "
         ;;
       "--"*)
         echo "$x is not a supported option." >&2
@@ -289,15 +386,15 @@ main(){
 
   mapfile -t cmdline < <(_cmdline | tr ' ' '\n');
 
-  while getopts ":ha" OPTION "${cmdline[@]}"; do
+  while getopts ":hi" OPTION "${cmdline[@]}"; do
 
     case $OPTION in
-      a)
-        API="YES";
-        ;;
       h)
         _usage;
         exit 0;
+        ;;
+      i)
+        PRINT_INFO="YES";
         ;;
       "?")
         echo "-${OPTARG} is not a supported option." >&2
@@ -305,6 +402,12 @@ main(){
       *);;
     esac
   done
+
+# If -i was passed without api key, exit with an error
+if [[ "${PRINT_INFO}" == "YES" && -z "${NWTOKEN}" ]]; then
+  echo "The '-i' requires an API-KEY" >&2
+  exit 1
+fi
 
 # Set variables for the domain information
   user="$(pwd | grep -Po "/(chroot/)?home/\K[^/]*")";
@@ -318,29 +421,12 @@ main(){
     exit 1
   fi
 
-# Prompt for an API-KEY if -a was passed, if not empty set headers. If not provided, prompt for host, port, and prefix
-
-  if [[ "${API}" == "YES" ]]; then
-  read -r -p "Enter API-KEY: " api_token
-  fi
-
 # If API-KEY is empty get host info
 
-  if [ -z "${api_token}" ]; then
+  if [[ -z "${NWTOKEN}" ]]; then
     get_host;
   else
-
-# Set the headers for the request
-
-  headers=(
-    -H "Authorization: Bearer ${api_token}"
-    -H "Accept: application/json"
-    -w "%{http_code}"
-    -o "/dev/null"
-  )
-
 # Check the API-KEY for a 200 response
-
     check_api;
   fi
 }
