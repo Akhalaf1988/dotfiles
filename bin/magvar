@@ -106,7 +106,7 @@ varnish_domain_map(){
 
 # define local vars
 
-  local base_url domain vardommap_tempvardommap_base
+  local base_url domain vardommap_temp vardommap_base
 
   printf "Checking varnish domain map..."
 # Set base url info
@@ -123,14 +123,11 @@ varnish_domain_map(){
       printf "%sAdding ${dom} to varnish map..."
       sudo enable-varnish-secondary.sh "${user}" "${dom}"
       printf "done\n"
-
-  else
-     if [[ -z "${vardommap_temp}" ]]; then
+  elif [[ -z "${vardommap_base}" ]]; then
         printf "done\n"
         printf "%sAdding ${domain} to varnish map..."
         sudo enable-varnish-secondary.sh "${user}" "${base_url}"
         printf "done\n"
-    fi
   fi
   printf "done\n"
 }
