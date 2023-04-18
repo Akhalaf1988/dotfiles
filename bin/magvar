@@ -3,7 +3,6 @@
 # Script Arguments
 
   ARGA=("$@")
-  API=""
   ENABLE_VARNISH=""
   PRINT_INFO=""
 
@@ -14,15 +13,13 @@ _usage() {
 
   cat <<- EOF
 
-Description: Install Varnish on Cloudhost servers
+Description: Install Varnish on Cloudhost servers. If you have a nocworx token it will auto install else if will ask for the info.
 Use: magevr
-Advanced Use: magevr -ay
 
    Optional Argument:
 
-     -a|--api     Promts For An Api-Token To Use For Install
      -y|--yes     Skip all prompts
-     -i|--info    If used with --api the script will get extra Varnish info
+     -i|--info    Print varnish info if NWTOKEN is set
 
 EOF
 }
@@ -133,7 +130,7 @@ install(){
   printf "%s  Host: ${host}\n"
   printf "%s  Port: ${port}\n"
 
-  if [[ "${API}" == "YES" ]]; then
+  if [[ -n "${NWTOKEN}" ]]; then
       varnish_stat
   fi
 
@@ -294,7 +291,7 @@ check_api(){
 # set headers for the request
 
   headers=(
-    -H "Authorization: Bearer ${api_token}"
+    -H "Authorization: Bearer ${NWTOKEN}"
     -H "Accept: application/json"
     -w "%{http_code}"
     -o "/dev/null"
@@ -354,9 +351,6 @@ _cmdline() {
   for x in "${ARGA[@]}"; do
 
     case "$x" in
-     "--api"|"-a")
-        args="${args}-a "
-        ;;
      "--yes"|"-y")
         args="${args}-y "
         ;;
@@ -386,12 +380,9 @@ main(){
 
   mapfile -t cmdline < <(_cmdline | tr ' ' '\n');
 
-  while getopts ":hayi" OPTION "${cmdline[@]}"; do
+  while getopts ":hyi" OPTION "${cmdline[@]}"; do
 
     case $OPTION in
-      a)
-        API="YES";
-        ;;
       y)
         ENABLE_VARNISH="YES";
         ;;
@@ -410,14 +401,14 @@ main(){
   done
 
 # If -i was passed without -a, exit with an error
-if [[ "${PRINT_INFO}" == "YES" && -z "${API}" ]]; then
-  echo "The '-i' requires --api flag" >&2
+if [[ "${PRINT_INFO}" == "YES" && -z "${NWTOKEN}" ]]; then
+  echo "The '-i' requires an API-KEY" >&2
   exit 1
 fi
 
 # If -i was passed with -y, exit with an error
 if [[ "${PRINT_INFO}" == "YES" && -n "${ENABLE_VARNISH}" ]]; then
-  echo "The -i Flag can only be ran with --api" >&2
+  echo "The -i Flag can not be used during install" >&2
   exit 1
 fi
 
@@ -434,15 +425,9 @@ fi
     exit 1
   fi
 
-# Prompt for an API-KEY if -a was passed, if not empty set headers. If not provided, prompt for host, port, and prefix
-
-  if [[ "${API}" == "YES" ]]; then
-  read -r -p "Enter API-KEY: " api_token
-  fi
-
-
-  if [ -z "${api_token}" ]; then
-# If API-KEY is empty get host info
+# If API-KEY is empty get host info else
+# Check the API-KEY for a 200 response
+  if [ -z "${NWTOKEN}" ]; then
     get_host;
   else
 # Check the API-KEY for a 200 response
