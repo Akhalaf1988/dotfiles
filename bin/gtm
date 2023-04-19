@@ -8,6 +8,8 @@ import time
 API_KEY = os.getenv('GTtoken')
 API_URL = "https://gtmetrix.com/api/2.0"
 
+file_arg = False
+
 #run a scan on domian
 def run_scan(domain):
     #build the request
@@ -30,7 +32,6 @@ def run_scan(domain):
         json=test_data,
     )
     try:
-       #response does not contain data if the scan fails so we need a try block
        response_data = response.json()["data"]["attributes"]
        state = response_data["state"]
        if state == "error":
@@ -38,13 +39,12 @@ def run_scan(domain):
            print(f"Scan failed {error}")
        else:
            test_id = response.json()["data"]["id"]
-           print(f"Scan started for {domain}, id: {test_id}")
+          # print(f"Scan started for {domain}, id: {test_id}")
            Check_status(response,test_id,state,domain)
     except KeyError:
         print(f"Scan Failed for domain {domain}")
 
 def Check_status(response,test_id,state,domain):
-    #loop to check the status and state of the request.
     while True:
         try:
             state = response.json()["data"]["attributes"]["state"]
@@ -54,20 +54,19 @@ def Check_status(response,test_id,state,domain):
                 f"{API_URL}/tests/{test_id}",
                 auth=(API_KEY, ""),
             )
-            #get the report id 
             report_id = response.json()["data"]["id"] #
             gen_report(report_id,domain)
             break
 
         if response.status_code == 202:
-            print("Scan has been queued")
+     #       print("Scan has been queued")
             time.sleep(7)
             response = requests.get(
                 f"{API_URL}/tests/{test_id}",
                 auth=(API_KEY, ""),
             )
         elif response.status_code == 200 and state == "started":
-            print(f"Scan is in progress: {state}")
+    #        print(f"Scan is in progress: {state}")
             time.sleep(15)
             response = requests.get(
                 f"{API_URL}/tests/{test_id}",
@@ -76,24 +75,29 @@ def Check_status(response,test_id,state,domain):
         else:
             if state == "error":
                 error = response.json()["data"]["attributes"]["error"]
-                print(f"Scan failed: {state}")
+     #           print(f"Scan failed: {state}")
                 print(f"Error: {error}")
                 break
 
 def gen_report(report_id,domain):
-    
-    print(f"\nScan complete for {domain}")
-    print(f"Scan report: https://gtmetrix.com/reports/{domain}/{report_id}")
+
+  #  print(f"\nScan complete for {domain}")
+    if file_arg == False:
+        print(f"Scan report: https://gtmetrix.com/reports/{domain}/{report_id}")
+    elif file_arg == True:
+        print(f"https://gtmetrix.com/reports/{domain}/{report_id}")
+
     report_url = f"{API_URL}/reports/{report_id}"
-    #new request to get the report
     report_response = requests.get(
         report_url,
         auth=(API_KEY, ""),
     )
-    #Generate stats
     load_time = report_response.json()["data"]["attributes"]["fully_loaded_time"]
     load_time_seconds = load_time  / 1000
-    print(f"Full load time: {load_time_seconds}s")
+    if file_arg == False:
+        print(f"Full load time: {load_time_seconds}s")
+    elif file_arg == True:
+        print(f"{load_time_seconds}s")
 
 def main():
     parser = argparse.ArgumentParser()
@@ -103,8 +107,14 @@ def main():
     args = parser.parse_args()
 
     if args.domain:
+        print(f"Starting scan for {args.domain}")
+        print("")
+        file_arg = False
         run_scan(args.domain)
     elif args.file:
+        print(f"Starting scan on {args.file}")
+        print("")
+        file_arg = True
         if not os.path.exists(args.file):
             print(f"File '{args.file}' not found.")
             return
