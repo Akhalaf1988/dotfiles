@@ -18,8 +18,9 @@ Use: magevr
 
    Optional Argument:
 
-     -y|--yes     Skip all prompts
+     -h|--help    Display this message
      -i|--info    Print varnish info if NWTOKEN is set
+     -y|--yes     Skip all prompts
 
 EOF
 }
