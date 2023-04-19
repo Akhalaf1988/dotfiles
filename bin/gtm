@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+
+# Import needed modules
+
 import argparse
 import os
 import requests
@@ -8,9 +11,11 @@ import time
 API_KEY = os.getenv('GTtoken')
 API_URL = "https://gtmetrix.com/api/2.0"
 
+# Boolan value used to determine if a file of a domain has been passed as an arg.
 file_arg = False
 
 #run a scan on domian
+
 def run_scan(domain):
     #build the request
     test_data = {
@@ -24,6 +29,7 @@ def run_scan(domain):
             },
         },
     }
+    
     #POST Request that kicks off scan
     response = requests.post(
         f"{API_URL}/tests",
@@ -31,6 +37,9 @@ def run_scan(domain):
         headers={"Content-Type": "application/vnd.api+json"},
         json=test_data,
     )
+    
+    # TRy block to catch an exceptions such as KeyError 
+    
     try:
        response_data = response.json()["data"]["attributes"]
        state = response_data["state"]
@@ -44,6 +53,8 @@ def run_scan(domain):
     except KeyError:
         print(f"Scan Failed for domain {domain}")
 
+# Used to check the state of the scan.
+        
 def Check_status(response,test_id,state,domain):
     while True:
         try:
@@ -54,7 +65,7 @@ def Check_status(response,test_id,state,domain):
                 f"{API_URL}/tests/{test_id}",
                 auth=(API_KEY, ""),
             )
-            report_id = response.json()["data"]["id"] #
+            report_id = response.json()["data"]["id"] 
             gen_report(report_id,domain)
             break
 
