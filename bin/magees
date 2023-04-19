@@ -55,7 +55,7 @@ elastic_stat(){
   name_conf='{name, configuration}'
   e_curl=$(echo "${_addon_curl}" | jq -r "${name_conf}" | tr -d '",{}')
 
-# Print varnish stats
+# Print Elastic search stats
 
   printf "%s${e_curl}\n"
 
