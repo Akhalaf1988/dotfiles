@@ -137,12 +137,12 @@ varnish_domain_map(){
   if [[ -z "${vardommap_temp}" ]]; then
       printf "done\n"
       printf "%sAdding ${dom} to varnish map..."
-      sudo enable-varnish-secondary.sh "${user}" "${dom}"
+      sudo enable-varnish-secondary.sh "${user}" "${dom}" 2>&1 /dev/null
       printf "done\n"
   elif [[ -z "${vardommap_base}" ]]; then
         printf "done\n"
         printf "%sAdding ${domain} to varnish map..."
-        sudo enable-varnish-secondary.sh "${user}" "${base_url}"
+        sudo enable-varnish-secondary.sh "${user}" "${base_url}" 2>&1 /dev/null
         printf "done\n"
   fi
   printf "done\n"
