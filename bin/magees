@@ -16,7 +16,7 @@ Use: mages
    Optional Argument:
 
      -h|--help     Display this message
-     -i|--info     Display Varnish info from portal. requires an NWTOKEN
+     -i|--info     Display Elastic info from portal. Requires an NWTOKEN
 
 EOF
 }
