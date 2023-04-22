@@ -1,6 +1,7 @@
 #! /usr/bin/env bash
 
-## TODO Testing on a multi-site, capture all additional sites for varnish mapping
+## TODO multi-site, capture all additional sites for varnish mapping
+
 
 # Script Arguments
 
