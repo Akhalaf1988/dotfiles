@@ -2,7 +2,6 @@
 
 ## TODO 
 ## 1. multi-site, capture all additional sites for varnish domain mapping
-## 2. Add option to input api-key if they only want to run this script
 
 # Script Arguments
 
