@@ -1,7 +1,8 @@
 #! /usr/bin/env bash
 
-## TODO multi-site, capture all additional sites for varnish mapping
-
+## TODO 
+## 1. multi-site, capture all additional sites for varnish domain mapping
+## 2. Add option to input api-key if they only want to run this script
 
 # Script Arguments
 
@@ -133,6 +134,9 @@ varnish_domain_map(){
   domain=$(_normalizedomain "${base_url}");
   vardommap_temp=$(grep "${dom}" /etc/nginx/conf.d/varnish-domainmap.conf)
   vardommap_base=$(grep "${domain}" /etc/nginx/conf.d/varnish-domainmap.conf)
+  
+  
+  ##TODO Will need to capture additional sites for a multisite and possibly run a loop on that
 
 # Check if temp or base url get an empty value. 
 # If empty enable varnish secondary domains.
