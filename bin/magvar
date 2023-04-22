@@ -1,5 +1,7 @@
 #! /usr/bin/env bash
 
+## TODO Testing on a multi-site, capture all additional sites for varnish mapping
+
 # Script Arguments
 
   ARGA=("$@")
@@ -486,7 +488,7 @@ main(){
     esac
   done
 
-# If -i was passed without -a, exit with an error
+# If -i was passed without an api token, exit with an error
 if [[ "${PRINT_INFO}" == "YES" && -z "${NWTOKEN}" ]]; then
   echo "The '-i' requires an API-KEY" >&2
   exit 1
@@ -505,7 +507,7 @@ fi
   dom_check=$(find /etc/httpd/conf.d/ -type f -iname "vhost_${dom}.conf")
   siteworx=$(sudo -u iworx /usr/local/interworx/bin/config.pex --list --siteworx "${dom}");
 
-# Check for a vhost with the domain name
+# Check for a vhost with the domain name 
   if [[ -z ${dom_check} ]]; then
     echo -e "Must be in a domain directory";
     exit 1
