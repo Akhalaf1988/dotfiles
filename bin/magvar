@@ -28,7 +28,7 @@ EOF
 sudo_php(){
 
 # use_paths is a boolan value.
-# if set to true, run the top command, less the bottom
+# if set to true, run the top command, else the bottom
 
   if [ "$use_paths" = true ]; then
     sudo -u "${user}" "${phpv_path}" "${magento_path}" "$@"
@@ -138,12 +138,10 @@ varnish_domain_map(){
       printf "done\n"
       printf "%sAdding ${dom} to varnish map..."
       sudo enable-varnish-secondary.sh "${user}" "${dom}" 2>&1 /dev/null
-      printf "done\n"
   elif [[ -z "${vardommap_base}" ]]; then
         printf "done\n"
         printf "%sAdding ${domain} to varnish map..."
         sudo enable-varnish-secondary.sh "${user}" "${base_url}" 2>&1 /dev/null
-        printf "done\n"
   fi
   printf "done\n"
 }
@@ -168,8 +166,8 @@ install(){
 
 # Set the host and port and then update the env.php file
 
-  sudo_php config:set "${sfv}"/"${beh}" "${host}" -q
-  sudo_php config:set "${sfv}"/"${bep}" "${port}" -q
+  sudo_php config:set "${sfv}/${beh}" "${host}" -q
+  sudo_php config:set "${sfv}/${bep}" "${port}" -q
   sudo_php setup:config:set --http-cache-hosts="${host}:${port}" -n -q
   printf "done\n"
 
@@ -194,6 +192,8 @@ install(){
   printf "%s  Host: ${host}\n"
   printf "%s  Port: ${port}\n"
 
+# This would be the last function called and if the api key is present display this extra varnish info
+
   if [[ -n "${NWTOKEN}" ]]; then
       varnish_stat
   fi
@@ -217,7 +217,9 @@ check_cache_app (){
   sys_cache='system/full_page_cache/caching_application'
   cache_app_num=$(sudo_php config:show | grep "${sys_cache}" | awk '{print $3}' | grep "2")
 
-# If cache_app_num gives an empty value then varnish is not enabled.
+# Check If cache_app_num gives an empty value which would mean varnish is not enabled.
+# By default since this is geared towards migrations, we are going to assume we are just updating so if we see 1 prompt
+# We still do want to give the option to enable
 
   if [[ -z "${cache_app_num}" && "${ENABLE_VARNISH}" != "YES" ]]; then
       printf "done\n"
@@ -228,7 +230,7 @@ check_cache_app (){
           install
           ;;
         *)
-          printf "Process cancelled"
+          printf "Fine did not want to install it anyway"
           printf "\n"
           exit 1
           ;;
@@ -241,9 +243,9 @@ fi
 
 check_install_path(){
 
-# Needed to check where bin/magento is installed
+# Check install php and php version.
 
-  printf "Checking path..."
+  printf "Checking path and php version..."
 
 # Set php version to use for install
 
@@ -263,11 +265,10 @@ check_install_path(){
       printf "done\n"
       echo "Error: bin/magento not found in the current or parent directory."
   fi
-
-# Check value of caching app
   printf "done\n"
 
-# Check if cache app is set to 1.
+# Check if cache app is set to 1 if all checks pass.
+
   check_cache_app
 
 }
@@ -298,7 +299,7 @@ _check_status(){
     printf "%sError: HTTP response code was not 200 ${response}\n"
   fi
 
-# Check if -i was passed
+# Check if -i was passed, if so skip the install and jump right to stats
 
   if [[ "${PRINT_INFO}" == "YES" ]]; then
      varnish_stat;
