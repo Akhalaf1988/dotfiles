@@ -375,7 +375,7 @@ check_api(){
     -o "/dev/null"
   )
 
-# Set API URL
+# Set API URL and container endpoint
 
   api_url='https://nocworx.nexcess.net/api/v1/as-client'
   container_endpoint="${acc_id}/v1/site/${site_id}/container"
@@ -387,7 +387,7 @@ check_api(){
   resp=$(curl --silent "${api_url}/${container_endpoint}" "${headers[@]}");
 
 # Check reponse code. If not 200 get host and port info
-# Else try to get the container info
+# Else try to get the container info with api info
 
   if [ "${resp}" -ne 200 ]; then
      printf "done\n"
