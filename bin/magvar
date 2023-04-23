@@ -473,7 +473,6 @@ main(){
   done
 
 # Set variables for the domain information
-
   user="$(pwd | grep -Po "/(chroot/)?home/\K[^/]*")";
   dom="$(pwd| grep -Po "/(chroot/)?home/${user}/\K[^/]*")";
   dom_check=$(find /etc/httpd/conf.d/ -type f -iname "vhost_${dom}.conf")
@@ -486,11 +485,9 @@ main(){
   fi
 
 # Check install path for bin/magento or app/etc/env
-
   _check_install_path
 
 # check for input or an existing api key
-
   _check_api_input
 
 }
