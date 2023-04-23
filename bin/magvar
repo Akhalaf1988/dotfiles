@@ -3,14 +3,12 @@
 # Script Arguments
 
   ARGA=("$@")
-  ENABLE_VARNISH=""
   PRINT_INFO=""
   API_KEY=""
 
 _usage() {
 
 # Print help
-
   cat <<- EOF
 
 Description: Install Varnish on Cloudhost servers. If you have a nocworx token it will auto install else if will ask for the info.
@@ -21,15 +19,13 @@ Use: magevr
      -a|--api     Prompt to use an api-token
      -h|--help    Display this message
      -i|--info    Print varnish info if api-token is set
-     -y|--yes     Skip Y/n prompts
 
 EOF
 }
 
 sudo_php(){
 
-# use_paths is a boolan. if set to true, run the top command, else the bottom
-
+# use_paths is a boolan value. If set to true, run the top command, else the bottom
   if [[ "$use_paths" = true ]]; then
     sudo -u "${user}" "${phpv_path}" "${magento_path}" "$@"
   else
@@ -67,7 +63,7 @@ purge_varnish(){
   local varnish_headers
 
   printf "Flushing Varnish cache..."
-  
+
 # Set new headers for curl
   varnish_headers=(
     -H "Host: ${dom}"
@@ -98,7 +94,6 @@ mysql_base_url_info(){
 
 # We are going to need to capture domains in a multi-site so we need to use mysql
 # We are going to break down the command into smaller chunks so its not so long.
-
   _columns='DISTINCT SUBSTRING_INDEX(SUBSTRING_INDEX(value, "|", 3), "://", -1) AS base_url'
   _table='core_config_data'
   _where_clause='path LIKE "%secure/base%" AND (value LIKE "http://%" OR value LIKE "https://%")'
@@ -113,8 +108,7 @@ mysql_base_url_info(){
 
 # Execute the query and remove the tabs using sed, set as a variable
   _base_urls=$(sudo mysql "${_conf}" ${_defaults} -N -e "use ${_db}; ${_query}" | sed -e 's/\t//g' -e 's/\///g')
- 
- use_paths=true
+  use_paths=true
 
 }
 
@@ -151,10 +145,9 @@ install(){
 
   printf "Installing Varnish and setting env.php..."
 
-# If YN is equal to any of those values enable varnish
-  if [[ "${YN}" =~ ^(Y|y|yes|YES|Yes)$ || "${ENABLE_VARNISH}" == "YES" ]]; then
-      sudo_php config:set "${sys_cache}" 2 >> ~/magvar.log 2>&1
-  fi
+# Set system/cache to 2 which should enable varnish
+
+  sudo_php config:set "${sys_cache}" 2 >> ~/magvar.log 2>&1
 
 # Set the host and port and then update the env.php file
   sudo_php config:set "${sfv}/${beh}" "${host}" >> ~/magvar.log 2>&1
@@ -184,43 +177,6 @@ install(){
       varnish_stat
   fi
 
-}
-
-check_cache_app (){
-
-# Define local variables
-  local cache_app_num sys_cache YN
-
-# Boolan, If set to true include path/to/php bin/magento in sudo_php function
-  use_paths=true
-
-# Check if system/full_page_cache/caching_application is set to 2, if set to one varnish is not enabled.
-  printf "Checking For varnish..."
-  sys_cache='system/full_page_cache/caching_application'
-  cache_app_num=$(sudo_php config:show | grep "${sys_cache}" | awk '{print $3}' | grep "2")
-
-# Check If cache_app_num gives an empty value which would mean varnish is not enabled.
-# By default since this is geared towards migrations, we are going to assume we are just updating so if we see 1 prompt
-# We still do want to give the option to enable
-
-  if [[ -z "${cache_app_num}" && "${ENABLE_VARNISH}" != "YES" ]]; then
-      printf "done\n"
-      printf "Varnish is not Enabled, full_page_cache is set to 1\n"
-      read -r -p "Would you like to enable (Y/n): " YN;
-      case "${YN}" in
-        "Y" | "y" | "yes" | "YES" | "Yes")
-          install
-          ;;
-        *)
-          printf "Process cancelled"
-          printf "\n"
-          exit 1
-          ;;
-      esac
-  else
-     printf "done\n"
-     install
-fi
 }
 
 _check_install_path(){
@@ -276,7 +232,7 @@ _check_status(){
   if [[ "${PRINT_INFO}" == "YES" ]]; then
      varnish_stat;
   else
-     check_cache_app;
+     install;
   fi
 
 }
@@ -320,7 +276,7 @@ _get_container_info(){
      printf "%s  Port: ${port}\n"
      varnish_stat;
   else
-     check_cache_app;
+     install;
   fi
 }
 
@@ -419,9 +375,6 @@ _cmdline() {
      "--api"|"-a")
         args="${args}-a "
         ;;
-     "--yes"|"-y")
-        args="${args}-y "
-        ;;
      "--help"|"-h")
         args="${args}-h "
         ;;
@@ -449,14 +402,11 @@ main(){
 
   mapfile -t cmdline < <(_cmdline | tr ' ' '\n');
 
-  while getopts ":ahyi" OPTION "${cmdline[@]}"; do
+  while getopts ":ahi" OPTION "${cmdline[@]}"; do
 
     case $OPTION in
       a)
         API_KEY="YES";
-        ;;
-      y)
-        ENABLE_VARNISH="YES";
         ;;
       h)
         _usage;
@@ -473,6 +423,7 @@ main(){
   done
 
 # Set variables for the domain information
+
   user="$(pwd | grep -Po "/(chroot/)?home/\K[^/]*")";
   dom="$(pwd| grep -Po "/(chroot/)?home/${user}/\K[^/]*")";
   dom_check=$(find /etc/httpd/conf.d/ -type f -iname "vhost_${dom}.conf")
@@ -485,9 +436,11 @@ main(){
   fi
 
 # Check install path for bin/magento or app/etc/env
+
   _check_install_path
 
 # check for input or an existing api key
+
   _check_api_input
 
 }
