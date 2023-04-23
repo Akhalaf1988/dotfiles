@@ -137,8 +137,10 @@ varnish_domain_map(){
 
 install(){
 
+  use_paths=true
 # Build the Varnish args..Im trying to make the names as small as possible.
 # This way the command is not SUPER LONG!!!!!!!!!!!!!!!!
+  sys_cache='system/full_page_cache/caching_application'
   sfv='system/full_page_cache/varnish'
   beh='backend_host'
   bep='backend_port'
