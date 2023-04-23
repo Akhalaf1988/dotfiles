@@ -28,8 +28,7 @@ EOF
 
 sudo_php(){
 
-# use_paths is a boolan value.
-# if set to true, run the top command, else the bottom
+# use_paths is a boolan. if set to true, run the top command, else the bottom
 
   if [[ "$use_paths" = true ]]; then
     sudo -u "${user}" "${phpv_path}" "${magento_path}" "$@"
@@ -42,28 +41,22 @@ sudo_php(){
 varnish_stat(){
 
 # Define local variables
-
   local addon_selector addon_uri _addon_curl name_conf v_curl
 
 # Set vars for addon info
-
   addon_selector='.[] | select(.type.identity | contains("varnish"))| .addon.metadata.uri'
 
 # Get the addon endpoint
-
   addon_uri=$(echo "${_curl}" | jq -r "${addon_selector}")
 
 # Build the new Curl request for addon info
-
   _addon_curl=$(curl -s "${api_url}/${acc_id}${addon_uri}" "${headers[@]}");
 
 # build the varnish curl
-
   name_conf='{name, configuration}'
   v_curl=$(echo "${_addon_curl}" | jq -r "${name_conf}" | tr -d '",{}')
 
 # Print varnish stats
-
   printf "%s${v_curl}\n"
 
 }
@@ -71,13 +64,11 @@ varnish_stat(){
 purge_varnish(){
 
 # Define local variables
-
   local varnish_headers
 
   printf "Flushing Varnish cache..."
-
+  
 # Set new headers for curl
-
   varnish_headers=(
     -H "Host: ${dom}"
     -H "X-Magento-Tags-Pattern: .*"
@@ -86,11 +77,9 @@ purge_varnish(){
   )
 
 # Boolan, If set to true include path/to/php bin/magento in sudo_php function
-
   use_paths=false
 
 # Send a curl request to purge the cache
-
   sudo_php curl -s "${host}:${port}" "${varnish_headers[@]}"
   printf "done\n"
 
@@ -101,11 +90,9 @@ mysql_base_url_info(){
   local _db _columns _table _where_clause _orderby _query
 
 # Boolan, If set to true include path/to/php bin/magento in sudo_php function
-
   use_paths=false
 
 # Grab database name from app/etc/env.php
-
   _db=$(sudo_php grep -E 'dbname|DB_NAME' "${config_file}"  | cut -d \' -f 4 | head -n1)
   _prefix=$(sudo_php grep 'table_prefix' "${config_file}"  | cut -d \' -f 4)
 
@@ -118,17 +105,16 @@ mysql_base_url_info(){
   _order_by='base_url'
 
 # Construct the SQL query string
-
   _query="SELECT ${_columns} FROM ${_prefix}${_table} WHERE ${_where_clause} ORDER BY ${_order_by}"
 
 # set vars for mysql command
-
   _conf='--defaults-extra-file=/root/.my.cnf'
   _defaults='--defaults-group-suffix=_root'
 
 # Execute the query and remove the tabs using sed, set as a variable
   _base_urls=$(sudo mysql "${_conf}" ${_defaults} -N -e "use ${_db}; ${_query}" | sed -e 's/\t//g' -e 's/\///g')
-  use_paths=true
+ 
+ use_paths=true
 
 }
 
