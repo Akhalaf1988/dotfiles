@@ -23,10 +23,7 @@ EOF
 
 sudo_php(){
 
-# use_paths is a boolan value
-# If set to true include path/to/php bin/magento
-# If not it will exclude those two fields
-
+# use_paths is a boolan value. If set to true include path/to/php bin/magento
   if [[ "$use_paths" = true ]]; then
      sudo -u "${user}" "${phpv_path}" "${magento_path}" "$@"
   else
@@ -39,28 +36,22 @@ elastic_stat(){
 
 # Define local variables
   local addon_selector addon_uri _addon_curl name_conf v_curl
-# Set vars for addon info
 
+# Set vars for addon info
   addon_selector='.[] | select(.type.identity | contains("elastic"))| .addon.metadata.uri'
 
 # Get the addon endpoint
-
   addon_uri=$(echo "${_curl}" | jq -r "${addon_selector}")
 
 # Build the new Curl request for addon info
-
   _addon_curl=$(curl -s "${api_url}/${acc_id}${addon_uri}" "${headers[@]}");
 
 # build the elastic curl
-
   name_conf='{name, configuration}'
   e_curl=$(echo "${_addon_curl}" | jq -r "${name_conf}" | tr -d '",{}')
 
 # Print Elastic search stats
-
   printf "%s${e_curl}\n"
-
-
 
 }
 
@@ -87,16 +78,13 @@ install(){
 
 # We need the prefix for the install
 # If the prefix is left blank, generate a random string
-
   prefix="${prefix:-$(shuf -er -n5 {a..z} {0..9} | tr -d '\n')}"
 
 # We need spacing before printing installing!
-
   printf "\n"
   printf "Installing\n"
 
 # Build the Elastic-search arguments
-
   ES_ARGS=(
     "--elasticsearch-host=${host}"
     "--elasticsearch-port=${port}"
@@ -105,48 +93,39 @@ install(){
   )
 
 # Actually do the install
-
   sudo_php setup:install "${ES_ARGS[@]}"
 
 # Reindex site
-
   printf "\n\nReindexing catalogsearch_fulltext...please wait\n"
   sudo_php indexer:reindex catalogsearch_fulltext
 
-
 # Flush magento cache
-
   printf "\nFlushing Magento cache..."
   sudo_php cache:flush -q
   printf "done\n"
 
 # Display ES info
-
   esinfo
 
 }
-
 
 check_install_version (){
 
 # Define local variables
   local magento_ops magento_version
 
-# use_paths is a boolan value used in sudo_php function
-# If set to true include path/to/php bin/magento
-
+# use_paths is a boolan value used in sudo_php function. If set to true include path/to/php bin/magento
   use_paths=true
 
 # We need to check the magento version, not all versions can be installed through bin/magento
 # For those that can not, we will just spit out ES info
 
   printf "Checking magento version..."
-# Get Magento version
 
+# Get Magento version
   magento_version=$(sudo_php --version | awk '{print $3}'| awk -F '-' '{print $1}');
 
 # Check if version is compatible with Elasticsearch
-
   if [[ "${magento_version}" < "2.3.1" ]]; then
       printf "done\n"
       echo "Magento version ${magento_version} is too low for Elasticsearch.";
@@ -154,11 +133,9 @@ check_install_version (){
   fi
 
 # Check for setup:install --elastic options
-
   magento_ops=$(sudo_php setup:install -h | grep "\-\-elastics")
 
 # If magento_options gives an empty value then this install is nto bin/magento compat
-
   if [[ -z "${magento_ops}" ]]; then
       printf "done\n"
       printf "%s\nThis Version ${magento_version} does not have /bin/magento support for ES\n"
@@ -175,17 +152,16 @@ check_install_path(){
 
 # Needed to check where bin/magento is installed
   printf "Checking path..."
+
 # Set php version to use for install
 
   phpv=$(echo "${siteworx}" | grep "SITEWORX_PHP_VERSION" | awk '{print $2}' | cut -d/ -f4);
   phpv_path="/usr/bin/${phpv}"
 
 # Set a default path
-
   magento_path="bin/magento"
 
 # check default path, if it does not exist check parent directory
-
   if [[ ! -e "${magento_path}" ]]; then
       magento_path="../bin/magento"
   fi
@@ -206,17 +182,13 @@ _check_status(){
   local response
 
 printf "Checking Elastic containter status..."
-
-# use_paths is a boolan value used in sudo_php function
-# If set to true include path/to/php bin/magento
-
+# use_paths is a boolan value used in sudo_php function. If set to true include path/to/php bin/magento
   use_paths=false
 
-  # Make a curl request to the provided host and port
-
+# Make a curl request to the provided host and port
   response=$(sudo_php curl -s -o /dev/null -w "%{http_code}" http://"${host}:${port}")
 
-  # If the response is 200, run the install function
+# If the response is 200, run the install function
   if [[ "${response}" -eq 200 ]]; then
     printf "done\n"
   else
@@ -225,7 +197,6 @@ printf "Checking Elastic containter status..."
   fi
 
 # Check if -i was passed
-
   if [[ "${PRINT_INFO}" == "YES" ]]; then
      elastic_stat;
   else
@@ -239,9 +210,7 @@ _get_container_info(){
 # Declare local variables
   local _curl port_selector version_selector
 
-# Remove some of the args from the headers
-# We only need bearer and accpet json
-
+# Remove some of the args from the headers. We only need bearer and accpet json
   headers=("${headers[@]:0:4}" "${headers[@]:8}")
 
 # Set curl var and use it to retrieve site container data from the API endpoint,
@@ -253,7 +222,6 @@ _get_container_info(){
   host=$(echo "${_curl}" | jq -r '.[].identity' | grep -i elast);
 
 # Check for an empty response on ES info and set variables if not
-
 # Else Parse the API response using jq to extract the publish port and version number
 # for the ElasticSearch container that matches the keyword 'elast' in the 'identity' field.
 # The extracted port and version values are then stored in the 'port' and 'version' variables,
@@ -273,7 +241,6 @@ _get_container_info(){
   fi
 
 # Check if -i was passed
-
   if [[ "${PRINT_INFO}" == "YES" ]]; then
      printf "\n"
      printf "Elastic-Search Info:\n\n"
@@ -287,7 +254,6 @@ _get_container_info(){
 }
 
 check_api(){
-
 # Declare local variables
   local resp
 
