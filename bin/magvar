@@ -1,14 +1,11 @@
 #! /usr/bin/env bash
 
-## TODO 
-## 1. multi-site, capture all additional sites for varnish domain mapping
-
 # Script Arguments
 
   ARGA=("$@")
   ENABLE_VARNISH=""
   PRINT_INFO=""
-
+  API_KEY=""
 
 _usage() {
 
@@ -19,11 +16,12 @@ _usage() {
 Description: Install Varnish on Cloudhost servers. If you have a nocworx token it will auto install else if will ask for the info.
 Use: magevr
 
-   Optional Argument:
+   Optional Arguments:
 
+     -a|--api     Prompt to use an api-token
      -h|--help    Display this message
-     -i|--info    Print varnish info if NWTOKEN is set
-     -y|--yes     Skip all prompts
+     -i|--info    Print varnish info if api-token is set
+     -y|--yes     Skip Y/n prompts
 
 EOF
 }
@@ -33,30 +31,11 @@ sudo_php(){
 # use_paths is a boolan value.
 # if set to true, run the top command, else the bottom
 
-  if [ "$use_paths" = true ]; then
+  if [[ "$use_paths" = true ]]; then
     sudo -u "${user}" "${phpv_path}" "${magento_path}" "$@"
   else
     sudo -u "${user}" "$@"
   fi
-
-}
-
-# This is needed bcause the base url looks like https://domain.com/ and we need to undo all the slashes
-
-_normalizedomain (){
-
-# Set up sedopts
-
-SEDOPTS=(
-
-   -e 's/https?:\/\///'
-   -e 's/\/.*//'
-   -e 's,\.$,,'
-  )
-  
-# echo the domain with the sedopts
-
-  echo "$1" | sed -r "${SEDOPTS[@]}" | tr '[:upper:]' '[:lower:]'
 
 }
 
@@ -106,9 +85,7 @@ purge_varnish(){
     -o "/dev/null"
   )
 
-
-# use_paths is a boolan value used in sudo_php function
-# If set to true include path/to/php bin/magento
+# Boolan, If set to true include path/to/php bin/magento in sudo_php function
 
   use_paths=false
 
@@ -119,36 +96,62 @@ purge_varnish(){
 
 }
 
+mysql_base_url_info(){
+
+  local _db _columns _table _where_clause _orderby _query
+
+# Boolan, If set to true include path/to/php bin/magento in sudo_php function
+
+  use_paths=false
+
+# Grab database name from app/etc/env.php
+
+  _db=$(sudo_php grep -E 'dbname|DB_NAME' "${config_file}"  | cut -d \' -f 4 | head -n1)
+  _prefix=$(sudo_php grep 'table_prefix' "${config_file}"  | cut -d \' -f 4)
+
+# We are going to need to capture domains in a multi-site so we need to use mysql
+# We are going to break down the command into smaller chunks so its not so long.
+
+  _columns='DISTINCT SUBSTRING_INDEX(SUBSTRING_INDEX(value, "|", 3), "://", -1) AS base_url'
+  _table='core_config_data'
+  _where_clause='path LIKE "%secure/base%" AND (value LIKE "http://%" OR value LIKE "https://%")'
+  _order_by='base_url'
+
+# Construct the SQL query string
+
+  _query="SELECT ${_columns} FROM ${_prefix}${_table} WHERE ${_where_clause} ORDER BY ${_order_by}"
+
+# set vars for mysql command
+
+  _conf='--defaults-extra-file=/root/.my.cnf'
+  _defaults='--defaults-group-suffix=_root'
+
+# Execute the query and remove the tabs using sed, set as a variable
+  _base_urls=$(sudo mysql "${_conf}" ${_defaults} -N -e "use ${_db}; ${_query}" | sed -e 's/\t//g' -e 's/\///g')
+  use_paths=true
+
+}
+
 varnish_domain_map(){
 
 # define local vars
+  local
 
-  local base_url domain vardommap_temp vardommap_base
+  printf "Adding domains to varnish domain mapping..."
 
-  printf "Checking varnish domain map..."
+# We need to get all the base urls first, if its a multi-site it should generate a list
+   mysql_base_url_info
 
-# Set base url info
+# Now we need to check that list against /etc/nginx/conf.d/varnish-domainmap.conf
+# Split base_urls into an array
+  readarray -t domains <<< "${_base_urls}"
 
-  base_url=$(sudo_php config:show | grep base_url | awk '{print $3}')
-  domain=$(_normalizedomain "${base_url}");
-  vardommap_temp=$(grep "${dom}" /etc/nginx/conf.d/varnish-domainmap.conf)
-  vardommap_base=$(grep "${domain}" /etc/nginx/conf.d/varnish-domainmap.conf)
-  
-  
-  ##TODO Will need to capture additional sites for a multisite and possibly run a loop on that
-
-# Check if temp or base url get an empty value. 
-# If empty enable varnish secondary domains.
-
-  if [[ -z "${vardommap_temp}" ]]; then
-      printf "done\n"
-      printf "%sAdding ${dom} to varnish map..."
-      sudo enable-varnish-secondary.sh "${user}" "${dom}" 2>&1 /dev/null
-  elif [[ -z "${vardommap_base}" ]]; then
-        printf "done\n"
-        printf "%sAdding ${domain} to varnish map..."
-        sudo enable-varnish-secondary.sh "${user}" "${base_url}" 2>&1 /dev/null
-  fi
+# Loop against it and if that domain is not in varnish-domainmap.conf add it
+  for domain in "${domains[@]}"; do
+    if ! grep -q "${domain}" "/etc/nginx/conf.d/varnish-domainmap.conf"; then
+      sudo enable-varnish-secondary.sh "${user}" "${domain}" >> ~/magvar.log 2>&1
+    fi
+  done
   printf "done\n"
 }
 
@@ -156,50 +159,41 @@ install(){
 
 # Build the Varnish args..Im trying to make the names as small as possible.
 # This way the command is not SUPER LONG!!!!!!!!!!!!!!!!
-
   sfv='system/full_page_cache/varnish'
   beh='backend_host'
   bep='backend_port'
 
-
   printf "Installing Varnish and setting env.php..."
 
 # If YN is equal to any of those values enable varnish
-
   if [[ "${YN}" =~ ^(Y|y|yes|YES|Yes)$ || "${ENABLE_VARNISH}" == "YES" ]]; then
-      sudo_php config:set "${sys_cache}" 2 -q
+      sudo_php config:set "${sys_cache}" 2 >> ~/magvar.log 2>&1
   fi
 
 # Set the host and port and then update the env.php file
-
-  sudo_php config:set "${sfv}/${beh}" "${host}" -q
-  sudo_php config:set "${sfv}/${bep}" "${port}" -q
-  sudo_php setup:config:set --http-cache-hosts="${host}:${port}" -n -q
+  sudo_php config:set "${sfv}/${beh}" "${host}" >> ~/magvar.log 2>&1
+  sudo_php config:set "${sfv}/${bep}" "${port}" >> ~/magvar.log 2>&1
+  sudo_php setup:config:set --http-cache-hosts="${host}:${port}" -n >> ~/magvar.log 2>&1
   printf "done\n"
 
 # add to varnish domain map.
-
   varnish_domain_map
 
 # Flush magento cache
-
   printf "Flushing Magento cache..."
-  sudo_php cache:flush -q
+  sudo_php cache:flush >> ~/magvar.log 2>&1
   printf "done\n"
 
 # Use purge_varnish function to Purge Varnish cache
-
   purge_varnish
 
 # Display varnish info
-
   printf "\n"
   printf "Varnish info:\n\n"
   printf "%s  Host: ${host}\n"
   printf "%s  Port: ${port}\n"
 
 # This would be the last function called and if the api key is present display this extra varnish info
-
   if [[ -n "${NWTOKEN}" ]]; then
       varnish_stat
   fi
@@ -209,16 +203,12 @@ install(){
 check_cache_app (){
 
 # Define local variables
+  local cache_app_num sys_cache YN
 
-  local cache_app_num
-
-# use_paths is a boolan value used in sudo_php function
-# If set to true include path/to/php bin/magento
-
+# Boolan, If set to true include path/to/php bin/magento in sudo_php function
   use_paths=true
 
 # Check if system/full_page_cache/caching_application is set to 2, if set to one varnish is not enabled.
-
   printf "Checking For varnish..."
   sys_cache='system/full_page_cache/caching_application'
   cache_app_num=$(sudo_php config:show | grep "${sys_cache}" | awk '{print $3}' | grep "2")
@@ -236,7 +226,7 @@ check_cache_app (){
           install
           ;;
         *)
-          printf "Fine did not want to install it anyway"
+          printf "Process cancelled"
           printf "\n"
           exit 1
           ;;
@@ -247,42 +237,35 @@ check_cache_app (){
 fi
 }
 
-check_install_path(){
+_check_install_path(){
 
-# Check install php and php version.
-
-  printf "Checking path and php version..."
+# define local variables
+  local phpv
 
 # Set php version to use for install
-
   phpv=$(echo "${siteworx}" | grep "SITEWORX_PHP_VERSION" | awk '{print $2}' | cut -d/ -f4);
   phpv_path="/usr/bin/${phpv}"
 
-# Set a default path
-
+# Set a default path for bin and env.php
   magento_path="bin/magento"
+  config_file="app/etc/env.php"
 
 # check default path, if it does not exist check parent directory
-
-  if [ ! -e "${magento_path}" ]; then
+  if [[ ! -e "${magento_path}" && ! -e "${config_file}" ]]; then
       magento_path="../bin/magento"
+      config_file="../app/etc/env.php"
   fi
-  if [ ! -e "${magento_path}" ]; then
-      printf "done\n"
-      echo "Error: bin/magento not found in the current or parent directory."
+  if [[ ! -e "${magento_path}" && ! -e "${config_file}" ]]; then
+#      printf "done\n"
+      echo "Error: Main install not found in the current or parent directory."
+      exit 1
   fi
-  printf "done\n"
-
-# Check if cache app is set to 1 if all checks pass.
-
-  check_cache_app
 
 }
 
 _check_status(){
 
 # Declare local variables
-
   local response
 
 # use_paths is a boolan value used in sudo_php function
@@ -293,12 +276,10 @@ _check_status(){
   printf "Checking Varnish containter status..."
 
 # Make a curl request to the provided host and port
- 
-  response=$(sudo_php curl -s -o /dev/null -w "%{http_code}" http://"${host}":"${port}")
+  response=$(sudo_php curl -s -o /dev/null -w "%{http_code}" http://"${host}:${port}")
 
 # If the response is 200, run the install function
- 
-   if [ "${response}" -eq 200 ]; then
+   if [[ "${response}" -eq 200 ]]; then
     printf "done\n"
   else
     printf "done\n"
@@ -306,11 +287,10 @@ _check_status(){
   fi
 
 # Check if -i was passed, if so skip the install and jump right to stats
-
   if [[ "${PRINT_INFO}" == "YES" ]]; then
      varnish_stat;
   else
-     check_install_path;
+     check_cache_app;
   fi
 
 }
@@ -318,7 +298,6 @@ _check_status(){
 _get_container_info(){
 
 # Declare local variables
-
   local port_selector
 
 # Remove some of the args from the headers
@@ -336,7 +315,6 @@ _get_container_info(){
   host=$(echo "${_curl}" | jq -r '.[].identity' | grep -i varnis);
 
 # Check for an empty response on varnish info and set variables if not
-
   if [[ -z "${host}" ]]; then
      printf "done\n"
      printf "Varnish Container is not Enabled!\n";
@@ -349,7 +327,6 @@ _get_container_info(){
   fi
 
 # Check if -i was passed
-
   if [[ "${PRINT_INFO}" == "YES" ]]; then
      printf "\n"
      printf "Varnish info:\n\n"
@@ -357,23 +334,20 @@ _get_container_info(){
      printf "%s  Port: ${port}\n"
      varnish_stat;
   else
-     check_install_path;
+     check_cache_app;
   fi
 }
 
 check_api(){
 
 # Declare local variables
-
   local resp
 
 # Extract site ID and account ID from siteworx data
-
   site_id=$(echo "${siteworx}" | grep 'account_id' | awk '{print $2}');
   acc_id=$(echo "${siteworx}" | grep '^client_id' | awk '{print $2}');
 
 # set headers for the request
-
   headers=(
     -H "Authorization: Bearer ${NWTOKEN}"
     -H "Accept: application/json"
@@ -382,20 +356,17 @@ check_api(){
   )
 
 # Set API URL and container endpoint
-
   api_url='https://nocworx.nexcess.net/api/v1/as-client'
   container_endpoint="${acc_id}/v1/site/${site_id}/container"
 
   printf "\nChecking api-key..."
 
 # Send curl to check api response
-
   resp=$(curl --silent "${api_url}/${container_endpoint}" "${headers[@]}");
 
 # Check reponse code. If not 200 get host and port info
 # Else try to get the container info with api info
-
-  if [ "${resp}" -ne 200 ]; then
+  if [[ "${resp}" -ne 200 ]]; then
      printf "done\n"
      printf "%skey not valid ${resp}\n";
      get_host;
@@ -409,28 +380,45 @@ check_api(){
 get_host(){
 
 # prompt for host, port and prefix info
-
   read -r -p "Enter Hostname: " host
   read -r -p "Enter Port: " port
 
-# Reprompt if any of the values are still empty
+# Reprompt for any missing values
 
-  while true; do
-# Check if all variables are set
-    if [[ -n "${host:-}" && -n "${port:-}" ]]; then
-      break
-    fi
-
-# Prompt the user for missing values
-    printf "All values must be provided.\n"
-    read -r -p "Enter host: " host
-    read -r -p "Enter port: " port
+  while [[ -z "${host}" || -z "${port}" ]]; do
+      if [[ -z "${host}" ]]; then
+          read -p "Host is missing. Enter host: " host
+      fi
+      if [[ -z "${port}" ]]; then
+          read -p "Port is missing. Enter port: " port
+      fi
   done
 
 # Once set, with the info they provided use _check_status function to verify it is enabled.
-  
   _check_status;
 
+}
+
+_check_api_input(){
+
+# prompt for api-key if -a flag is used
+  if [[ -z "${NWTOKEN}" && "${API_KEY}" == "YES" ]]; then
+      read -r -p "Enter API-TOKEN: " api_token
+      NWTOKEN="${api_token}"
+  fi
+
+# If -i was passed without -a or env var is empty exit with an error
+  if [[ "${PRINT_INFO}" == "YES" && -z "${NWTOKEN}" ]]; then
+    echo "The --info requires an API-KEY, see help" >&2
+    exit 1
+  fi
+
+# If API-KEY is empty get host info else check response code
+  if [ -z "${NWTOKEN}" ]; then
+    get_host;
+  else
+    check_api;
+  fi
 }
 
 # Convert long command line options into short ones for getopts
@@ -442,6 +430,9 @@ _cmdline() {
   for x in "${ARGA[@]}"; do
 
     case "$x" in
+     "--api"|"-a")
+        args="${args}-a "
+        ;;
      "--yes"|"-y")
         args="${args}-y "
         ;;
@@ -472,9 +463,12 @@ main(){
 
   mapfile -t cmdline < <(_cmdline | tr ' ' '\n');
 
-  while getopts ":hyi" OPTION "${cmdline[@]}"; do
+  while getopts ":ahyi" OPTION "${cmdline[@]}"; do
 
     case $OPTION in
+      a)
+        API_KEY="YES";
+        ;;
       y)
         ENABLE_VARNISH="YES";
         ;;
@@ -492,18 +486,6 @@ main(){
     esac
   done
 
-# If -i was passed without an api token, exit with an error
-if [[ "${PRINT_INFO}" == "YES" && -z "${NWTOKEN}" ]]; then
-  echo "The '-i' requires an API-KEY" >&2
-  exit 1
-fi
-
-# If -i was passed with -y, exit with an error
-if [[ "${PRINT_INFO}" == "YES" && -n "${ENABLE_VARNISH}" ]]; then
-  echo "The -i Flag can not be used during install" >&2
-  exit 1
-fi
-
 # Set variables for the domain information
 
   user="$(pwd | grep -Po "/(chroot/)?home/\K[^/]*")";
@@ -511,20 +493,20 @@ fi
   dom_check=$(find /etc/httpd/conf.d/ -type f -iname "vhost_${dom}.conf")
   siteworx=$(sudo -u iworx /usr/local/interworx/bin/config.pex --list --siteworx "${dom}");
 
-# Check for a vhost with the domain name 
+# Check for a vhost with the domain name
   if [[ -z ${dom_check} ]]; then
     echo -e "Must be in a domain directory";
     exit 1
   fi
 
-# If API-KEY is empty get host info else
-# Check the API-KEY for a 200 response
-  if [ -z "${NWTOKEN}" ]; then
-    get_host;
-  else
-# Check the API-KEY for a 200 response
-    check_api;
-  fi
+# Check install path for bin/magento or app/etc/env
+
+  _check_install_path
+
+# check for input or an existing api key
+
+  _check_api_input
+
 }
 
 main
