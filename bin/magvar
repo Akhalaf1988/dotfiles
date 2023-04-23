@@ -129,7 +129,7 @@ varnish_domain_map(){
 # Loop against it and if that domain is not in varnish-domainmap.conf add it
   for domain in "${domains[@]}"; do
     if ! grep -q "${domain}" "/etc/nginx/conf.d/varnish-domainmap.conf"; then
-      sudo enable-varnish-secondary.sh "${user}" "${domain}" >> ~/magvar.log 2>&1
+      sudo enable-varnish-secondary.sh "${user}" "${domain}" >> "${logfile}" 2>&1
     fi
   done
   printf "done\n"
@@ -149,12 +149,12 @@ install(){
 
 # Set system/cache to 2 which should enable varnish
 
-  sudo_php config:set "${sys_cache}" 2 >> ~/magvar.log 2>&1
+  sudo_php config:set "${sys_cache}" 2 >> "${logfile}" 2>&1
 
 # Set the host and port and then update the env.php file
-  sudo_php config:set "${sfv}/${beh}" "${host}" >> ~/magvar.log 2>&1
-  sudo_php config:set "${sfv}/${bep}" "${port}" >> ~/magvar.log 2>&1
-  sudo_php setup:config:set --http-cache-hosts="${host}:${port}" -n >> ~/magvar.log 2>&1
+  sudo_php config:set "${sfv}/${beh}" "${host}" >> "${logfile}" 2>&1
+  sudo_php config:set "${sfv}/${bep}" "${port}" >> "${logfile}" 2>&1
+  sudo_php setup:config:set --http-cache-hosts="${host}:${port}" -n >> "${logfile}" 2>&1
   printf "done\n"
 
 # add to varnish domain map.
@@ -162,7 +162,7 @@ install(){
 
 # Flush magento cache
   printf "Flushing Magento cache..."
-  sudo_php cache:flush >> ~/magvar.log 2>&1
+  sudo_php cache:flush >> "${logfile}" 2>&1
   printf "done\n"
 
 # Use purge_varnish function to Purge Varnish cache
@@ -430,6 +430,10 @@ main(){
   dom="$(pwd| grep -Po "/(chroot/)?home/${user}/\K[^/]*")";
   dom_check=$(find /etc/httpd/conf.d/ -type f -iname "vhost_${dom}.conf")
   siteworx=$(sudo -u iworx /usr/local/interworx/bin/config.pex --list --siteworx "${dom}");
+
+# Set var for log file
+  _date=$(date +"%m-%d-%Y")
+  logfile="$HOME/nxvarnish-${_date}.log"
 
 # Check for a vhost with the domain name
   if [[ -z ${dom_check} ]]; then
