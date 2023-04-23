@@ -114,9 +114,6 @@ mysql_base_url_info(){
 
 varnish_domain_map(){
 
-# define local vars
-  local
-
   printf "Adding domains to varnish domain mapping..."
 
 # We need to get all the base urls first, if its a multi-site it should generate a list
