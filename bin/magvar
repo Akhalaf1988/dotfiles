@@ -176,32 +176,6 @@ install(){
 
 }
 
-_check_install_path(){
-
-# define local variables
-  local phpv
-
-# Set php version to use for install
-  phpv=$(echo "${siteworx}" | grep "SITEWORX_PHP_VERSION" | awk '{print $2}' | cut -d/ -f4);
-  phpv_path="/usr/bin/${phpv}"
-
-# Set a default path for bin and env.php
-  magento_path="bin/magento"
-  config_file="app/etc/env.php"
-
-# check default path, if it does not exist check parent directory
-  if [[ ! -e "${magento_path}" && ! -e "${config_file}" ]]; then
-      magento_path="../bin/magento"
-      config_file="../app/etc/env.php"
-  fi
-  if [[ ! -e "${magento_path}" && ! -e "${config_file}" ]]; then
-#      printf "done\n"
-      echo "Error: Main install not found in the current or parent directory."
-      exit 1
-  fi
-
-}
-
 _check_status(){
 
 # Declare local variables
@@ -316,28 +290,6 @@ check_api(){
 
 }
 
-get_host(){
-
-# prompt for host, port and prefix info
-  read -r -p "Enter Hostname: " host
-  read -r -p "Enter Port: " port
-
-# Reprompt for any missing values
-
-  while [[ -z "${host}" || -z "${port}" ]]; do
-      if [[ -z "${host}" ]]; then
-          read -p "Host is missing. Enter host: " host
-      fi
-      if [[ -z "${port}" ]]; then
-          read -p "Port is missing. Enter port: " port
-      fi
-  done
-
-# Once set, with the info they provided use _check_status function to verify it is enabled.
-  _check_status;
-
-}
-
 _check_api_input(){
 
 # prompt for api-key if -a flag is used
@@ -358,6 +310,57 @@ _check_api_input(){
   else
     check_api;
   fi
+}
+_check_install_path(){
+
+# define local variables
+  local phpv
+
+# Set php version to use for install
+  phpv=$(echo "${siteworx}" | grep "SITEWORX_PHP_VERSION" | awk '{print $2}' | cut -d/ -f4);
+  phpv_path="/usr/bin/${phpv}"
+
+# Set a default path for bin and env.php
+  magento_path="bin/magento"
+  config_file="app/etc/env.php"
+
+# check default path, if it does not exist check parent directory
+  if [[ ! -e "${magento_path}" && ! -e "${config_file}" ]]; then
+      magento_path="../bin/magento"
+      config_file="../app/etc/env.php"
+  fi
+  if [[ ! -e "${magento_path}" && ! -e "${config_file}" ]]; then
+#      printf "done\n"
+      echo "Error: Main install not found in the current or parent directory."
+      exit 1
+  fi
+
+}
+
+_check_install_path(){
+
+# define local variables
+  local phpv
+
+# Set php version to use for install
+  phpv=$(echo "${siteworx}" | grep "SITEWORX_PHP_VERSION" | awk '{print $2}' | cut -d/ -f4);
+  phpv_path="/usr/bin/${phpv}"
+
+# Set a default path for bin and env.php
+  magento_path="bin/magento"
+  config_file="app/etc/env.php"
+
+# check default path, if it does not exist check parent directory
+  if [[ ! -e "${magento_path}" && ! -e "${config_file}" ]]; then
+      magento_path="../bin/magento"
+      config_file="../app/etc/env.php"
+  fi
+  if [[ ! -e "${magento_path}" && ! -e "${config_file}" ]]; then
+#      printf "done\n"
+      echo "Error: Main install not found in the current or parent directory."
+      exit 1
+  fi
+
 }
 
 # Convert long command line options into short ones for getopts
