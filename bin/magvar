@@ -17,10 +17,11 @@ Api-Usage: nxvarnish -a
 
    Optional Arguments:
 
-     -a|--api     Prompt to use an api-token
-     -f|--flush   Flush varnish cache
-     -h|--help    Display this message
-     -i|--info    Print varnish info if api-token is set
+     -a|--api     Prompt For an Api-Token
+     -h|--help    Display This Message
+     -i|--info    Print Varnish Info If Api-Token Is Set
+     -p|--purge   Purge Varnish Cache
+
 
 EOF
 }
@@ -383,16 +384,16 @@ _cmdline() {
      "--api"|"-a")
         args="${args}-a "
         ;;
-     "--flush"|"-f")
-        args="${args}-f "
-        ;;
      "--help"|"-h")
         args="${args}-h "
         ;;
      "--info"|"-i")
         args="${args}-i "
         ;;
-      "--"*)
+     "--purge"|"-p")
+        args="${args}-p "
+        ;;
+     "--"*)
         echo "$x is not a supported option." >&2
         ;;
       *)
@@ -413,14 +414,11 @@ main(){
 
   mapfile -t cmdline < <(_cmdline | tr ' ' '\n');
 
-  while getopts ":afhi" OPTION "${cmdline[@]}"; do
+  while getopts ":ahip" OPTION "${cmdline[@]}"; do
 
     case $OPTION in
       a)
         API_KEY="YES";
-        ;;
-      f)
-        FLUSH="YES";
         ;;
       h)
         _usage;
@@ -429,6 +427,9 @@ main(){
       i)
         PRINT_INFO="YES";
         ;;
+      p)
+        FLUSH="YES";
+        ;;        
      "?")
         echo "-${OPTARG} is not a supported option." >&2
         ;;
