@@ -12,7 +12,7 @@ _usage() {
   cat <<- EOF
 
 Description: Install Varnish on Cloudhost servers. If you have a nocworx token it will auto install else if will ask for the info.
-Use: magevr
+Use: nxvarnish -a
 
    Optional Arguments:
 
