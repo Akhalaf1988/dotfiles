@@ -5,6 +5,7 @@
   ARGA=("$@")
   PRINT_INFO=""
   API_KEY=""
+  FLUSH=""
 
 _usage() {
 
