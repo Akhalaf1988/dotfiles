@@ -17,6 +17,7 @@ Use: magevr
    Optional Arguments:
 
      -a|--api     Prompt to use an api-token
+     -f|--flush   Flush varnish cache
      -h|--help    Display this message
      -i|--info    Print varnish info if api-token is set
 
@@ -233,6 +234,8 @@ _check_status(){
 # Check if -i was passed, if so skip the install and jump right to stats
   if [[ "${PRINT_INFO}" == "YES" ]]; then
      varnish_stat;
+  elif [[ "${FLUSH}" == "YES" ]]; then
+     purge_varnish
   else
      install;
   fi
@@ -277,6 +280,8 @@ _get_container_info(){
      printf "%s  Host: ${host}\n"
      printf "%s  Port: ${port}\n"
      varnish_stat;
+  elif [[ "${FLUSH}" == "YES" ]]; then
+     purge_varnish
   else
      install;
   fi
@@ -377,6 +382,9 @@ _cmdline() {
      "--api"|"-a")
         args="${args}-a "
         ;;
+     "--flush"|"-f")
+        args="${args}-f "
+        ;;
      "--help"|"-h")
         args="${args}-h "
         ;;
@@ -404,11 +412,14 @@ main(){
 
   mapfile -t cmdline < <(_cmdline | tr ' ' '\n');
 
-  while getopts ":ahi" OPTION "${cmdline[@]}"; do
+  while getopts ":afhi" OPTION "${cmdline[@]}"; do
 
     case $OPTION in
       a)
         API_KEY="YES";
+        ;;
+      f)
+        FLUSH="YES";
         ;;
       h)
         _usage;
