@@ -11,8 +11,9 @@ _usage() {
 # Print help
   cat <<- EOF
 
-Description: Install Varnish on Cloudhost servers. If you have a nocworx token it will auto install else if will ask for the info.
-Use: nxvarnish -a
+Description: Varnish Tool for Nexcess Cloudhost Servers. 
+Usage: nxvarnish
+Api-Usage: nxvarnish -a
 
    Optional Arguments:
 
