@@ -1,0 +1,500 @@
+#! /usr/bin/env bash
+
+# Script Arguments
+
+  ARGA=("$@")
+  PRINT_INFO=""
+  API_KEY=""
+
+_usage() {
+
+# Print help
+  cat <<- EOF
+
+Description: Varnish Tool For Nexcess Cloud Servers.
+Install Usage: nxvarnish
+
+   Optional Arguments:
+
+     -a|--api     Prompt To Use An Api-Token
+     -b|--bypass  Bypass Varnish and Curl Apache
+     -h|--help    Display This Message
+     -i|--info    Print Varnish Info If Api-Token Is Set
+     -p|--purge   Purge Varnish Cache
+
+EOF
+}
+
+sudo_php(){
+
+# use_paths is a boolan value. If set to true, run the top command, else the bottom
+  if [[ "$use_paths" = true ]]; then
+    sudo -u "${user}" "${phpv_path}" "${magento_path}" "$@"
+  else
+    sudo -u "${user}" "$@"
+  fi
+
+}
+
+varnish_stat(){
+
+# Define local variables
+  local addon_selector addon_uri _addon_curl name_conf v_curl
+
+# Set vars for addon info
+  addon_selector='.[] | select(.type.identity | contains("varnish"))| .addon.metadata.uri'
+
+# Get the addon endpoint
+  addon_uri=$(echo "${_curl}" | jq -r "${addon_selector}")
+
+# Build the new Curl request for addon info
+  _addon_curl=$(curl -s "${api_url}/${acc_id}${addon_uri}" "${headers[@]}");
+
+# build the varnish curl
+  name_conf='{name, configuration}'
+  v_curl=$(echo "${_addon_curl}" | jq -r "${name_conf}" | tr -d '",{}')
+
+# Print varnish stats
+  printf "%s${v_curl}\n"
+
+}
+
+purge_varnish(){
+
+# Define local variables
+  local varnish_headers
+
+  printf "Flushing Varnish cache..."
+
+# Set new headers for curl
+  varnish_headers=(
+    -H "Host: ${dom}"
+    -H "X-Magento-Tags-Pattern: .*"
+    "-X PURGE"
+    -o "/dev/null"
+  )
+
+# Boolan, If set to true include path/to/php bin/magento in sudo_php function
+  use_paths=false
+
+# Send a curl request to purge the cache
+  sudo_php curl -s "${host}:${port}" "${varnish_headers[@]}"
+  printf "done\n"
+
+}
+
+mysql_base_url_info(){
+
+  local _db _columns _table _where_clause _orderby _query
+
+# Boolan, If set to true include path/to/php bin/magento in sudo_php function
+  use_paths=false
+
+# Grab database name from app/etc/env.php
+  _db=$(sudo_php grep -E 'dbname|DB_NAME' "${config_file}"  | cut -d \' -f 4 | head -n1)
+  _prefix=$(sudo_php grep 'table_prefix' "${config_file}"  | cut -d \' -f 4)
+
+# We are going to need to capture domains in a multi-site so we need to use mysql
+# We are going to break down the command into smaller chunks so its not so long.
+  _columns='DISTINCT SUBSTRING_INDEX(SUBSTRING_INDEX(value, "|", 3), "://", -1) AS base_url'
+  _table='core_config_data'
+  _where_clause='path LIKE "%secure/base%" AND (value LIKE "http://%" OR value LIKE "https://%")'
+  _order_by='base_url'
+
+# Construct the SQL query string
+  _query="SELECT ${_columns} FROM ${_prefix}${_table} WHERE ${_where_clause} ORDER BY ${_order_by}"
+
+# set vars for mysql command
+  _conf='--defaults-extra-file=/root/.my.cnf'
+  _defaults='--defaults-group-suffix=_root'
+
+# Execute the query and remove the tabs using sed, set as a variable
+  _base_urls=$(sudo mysql "${_conf}" ${_defaults} -N -e "use ${_db}; ${_query}" | sed -e 's/\t//g' -e 's/\///g')
+  use_paths=true
+
+}
+
+varnish_domain_map(){
+
+# define local vars
+  local
+
+  printf "Adding domains to varnish domain mapping..."
+
+# We need to get all the base urls first, if its a multi-site it should generate a list
+   mysql_base_url_info
+
+# Now we need to check that list against /etc/nginx/conf.d/varnish-domainmap.conf
+# Split base_urls into an array
+  readarray -t domains <<< "${_base_urls}"
+
+# Loop against it and if that domain is not in varnish-domainmap.conf add it
+  for domain in "${domains[@]}"; do
+    if ! grep -q "${domain}" "/etc/nginx/conf.d/varnish-domainmap.conf"; then
+      sudo enable-varnish-secondary.sh "${user}" "${domain}" >> "${logfile}" 2>&1
+    fi
+  done
+  printf "done\n"
+}
+
+install(){
+
+  use_paths=true
+# Build the Varnish args..Im trying to make the names as small as possible.
+# This way the command is not SUPER LONG!!!!!!!!!!!!!!!!
+  sys_cache='system/full_page_cache/caching_application'
+  sfv='system/full_page_cache/varnish'
+  beh='backend_host'
+  bep='backend_port'
+
+  printf "Installing Varnish and setting env.php..."
+
+# Set system/cache to 2 which should enable varnish
+
+  sudo_php config:set "${sys_cache}" 2 >> "${logfile}" 2>&1
+
+# Set the host and port and then update the env.php file
+  sudo_php config:set "${sfv}/${beh}" "${host}" >> "${logfile}" 2>&1
+  sudo_php config:set "${sfv}/${bep}" "${port}" >> "${logfile}" 2>&1
+  sudo_php setup:config:set --http-cache-hosts="${host}:${port}" -n >> "${logfile}" 2>&1
+  printf "done\n"
+
+# add to varnish domain map.
+  varnish_domain_map
+
+# Flush magento cache
+  printf "Flushing Magento cache..."
+  sudo_php cache:flush >> "${logfile}" 2>&1
+  printf "done\n"
+
+# Use purge_varnish function to Purge Varnish cache
+  purge_varnish
+
+# Display varnish info
+  printf "\n"
+  printf "Varnish info:\n\n"
+  printf "%s  Host: ${host}\n"
+  printf "%s  Port: ${port}\n"
+
+# This would be the last function called and if the api key is present display this extra varnish info
+  if [[ -n "${NWTOKEN}" ]]; then
+      varnish_stat
+  fi
+
+}
+
+_check_install_path(){
+
+# define local variables
+  local phpv
+
+
+# Set php version to use for install
+  phpv=$(sudo_php php -r "echo PHP_VERSION;" | sed 's/\.//g' | cut -c 1-2);
+  phpv_path="/usr/bin/${phpv}"
+
+# Set a default path for bin and env.php
+  magento_path="bin/magento"
+  config_file="app/etc/env.php"
+
+# check default path, if it does not exist check parent directory
+  if [[ ! -e "${magento_path}" && ! -e "${config_file}" ]]; then
+      magento_path="../bin/magento"
+      config_file="../app/etc/env.php"
+  fi
+  if [[ ! -e "${magento_path}" && ! -e "${config_file}" ]]; then
+#      printf "done\n"
+      echo "Error: Main install not found in the current or parent directory."
+      exit 1
+  fi
+
+}
+
+_check_status(){
+
+# Declare local variables
+  local response
+
+# use_paths is a boolan value used in sudo_php function
+# If set to true include path/to/php bin/magento
+
+  use_paths=false
+
+  printf "Checking Varnish containter status..."
+
+# Make a curl request to the provided host and port
+  response=$(sudo_php curl -s -o /dev/null -w "%{http_code}" http://"${host}:${port}")
+
+# If the response is 200, run the install function
+   if [[ "${response}" -eq 200 ]]; then
+    printf "done\n"
+  else
+    printf "done\n"
+    printf "%sError: HTTP response code was not 200 ${response}\n"
+  fi
+
+# Check if -i was passed, if so skip the install and jump right to stats
+  if [[ "${PRINT_INFO}" == "YES" ]]; then
+     varnish_stat;
+  elif [[ "${FLUSH}" == "YES" ]]; then
+     purge_varnish
+  else
+     install;
+  fi
+
+}
+
+_get_container_info(){
+
+# Declare local variables
+  local port_selector
+
+# Remove some of the args from the headers
+# We only need bearer and accpet json
+
+  headers=("${headers[@]:0:4}" "${headers[@]:8}")
+
+# Set curl var and use it to retrieve site container data from the API endpoint,
+# filter the response with jq to extract the 'identity' field
+# Then grep for the keyword 'varnis' to filter for varnish hosts.
+# Set the resulting host value to the 'host' variable.
+
+  printf "Grabbing Varnish info from Portal..."
+  _curl=$(curl -s "${api_url}/${container_endpoint}" "${headers[@]}");
+  host=$(echo "${_curl}" | jq -r '.[].identity' | grep -i varnis);
+
+# Check for an empty response on varnish info and set variables if not
+  if [[ -z "${host}" ]]; then
+     printf "done\n"
+     printf "Varnish Container is not Enabled!\n";
+     exit 1
+  else
+     printf "done\n"
+     port_selector='.[] | select(.type.identity | contains("varnish")) | .ports[0].publish_port'
+     port=$(echo "${_curl}" | jq -r "${port_selector}");
+     host="${host}.nxcli.net"
+  fi
+
+# Check if -i was passed
+  if [[ "${PRINT_INFO}" == "YES" ]]; then
+     printf "\n"
+     printf "Varnish info:\n\n"
+     printf "%s  Host: ${host}\n"
+     printf "%s  Port: ${port}\n"
+     varnish_stat;
+  elif [[ "${FLUSH}" == "YES" ]]; then
+     purge_varnish
+  else
+     install;
+  fi
+}
+
+check_api(){
+
+# Declare local variables
+  local resp
+
+# Define siteworx var
+  siteworx=$(sudo -u iworx /usr/local/interworx/bin/config.pex --list --siteworx "${dom}");
+
+# Extract site ID and account ID from siteworx data
+  site_id=$(echo "${siteworx}" | grep 'account_id' | awk '{print $2}');
+  acc_id=$(echo "${siteworx}" | grep '^client_id' | awk '{print $2}');
+
+# set headers for the request
+  headers=(
+    -H "Authorization: Bearer ${NWTOKEN}"
+    -H "Accept: application/json"
+    -w "%{http_code}"
+    -o "/dev/null"
+  )
+
+# Set API URL and container endpoint
+  api_url='https://nocworx.nexcess.net/api/v1/as-client'
+  container_endpoint="${acc_id}/v1/site/${site_id}/container"
+
+  printf "\nChecking api-key..."
+
+# Send curl to check api response
+  resp=$(curl --silent "${api_url}/${container_endpoint}" "${headers[@]}");
+
+# Check reponse code. If not 200 get host and port info
+# Else try to get the container info with api info
+  if [[ "${resp}" -ne 200 ]]; then
+     printf "done\n"
+     printf "%skey not valid ${resp}\n";
+     get_host;
+  else
+     printf "done\n"
+     _get_container_info;
+  fi
+
+}
+
+get_host(){
+
+# prompt for host, port and prefix info
+  read -r -p "Enter Hostname: " host
+  read -r -p "Enter Port: " port
+
+# Reprompt for any missing values
+
+  while [[ -z "${host}" || -z "${port}" ]]; do
+      if [[ -z "${host}" ]]; then
+          read -p "Host is missing. Enter host: " host
+      fi
+      if [[ -z "${port}" ]]; then
+          read -p "Port is missing. Enter port: " port
+      fi
+  done
+
+# Once set, with the info they provided use _check_status function to verify it is enabled.
+  _check_status;
+
+}
+curl_apache(){
+
+  local host url
+  read -r -p "Host: " host
+  read -r -p "Url: " url
+
+# Define ip
+  ip=$(head -n1 "${vhost}" | awk '{print $2}' | sed 's/>//g')
+
+# Build apache header
+  apache_header=(
+
+    -H "X-Forwarded-Proto: https"
+    -H "Ssl-Offloaded: 1"
+    -H "Host: ${host}"
+  )
+
+# Make the curl request
+  curl -sIL "${apache_header[@]}" http://"${ip}/${url}" | grep -v "Policy-Report-Only"
+  exit 0
+}
+_check_api_input(){
+
+# prompt for api-key if -a flag is used
+  if [[ -z "${NWTOKEN}" && "${API_KEY}" == "YES" ]]; then
+      read -r -p "Enter API-TOKEN: " api_token
+      NWTOKEN="${api_token}"
+  fi
+
+# If -i was passed without -a or env var is empty exit with an error
+  if [[ "${PRINT_INFO}" == "YES" && -z "${NWTOKEN}" ]]; then
+    echo "The --info requires an API-KEY, see help" >&2
+    exit 1
+  fi
+
+# Check if they want to bypass apache with a curl
+  if [[ "${BYPASS}" == "YES" ]]; then
+      curl_apache
+  fi
+
+# If API-KEY is empty get host info else check response code
+  if [ -z "${NWTOKEN}" ]; then
+    get_host;
+  else
+    check_api;
+  fi
+}
+
+# Convert long command line options into short ones for getopts
+
+_cmdline() {
+
+  local x;
+
+  for x in "${ARGA[@]}"; do
+
+    case "$x" in
+     "--api"|"-a")
+        args="${args}-a "
+        ;;
+     "--bypass"|"-b")
+        args="${args}-b "
+        ;;
+     "--help"|"-h")
+        args="${args}-h "
+        ;;
+     "--info"|"-i")
+        args="${args}-i "
+        ;;
+     "--purge"|"-p")
+        args="${args}-p "
+        ;;
+      "--"*)
+        echo "$x is not a supported option." >&2
+        ;;
+      *)
+        args="${args}${x} "
+        ;;
+    esac
+  done
+
+  echo "$args";
+
+}
+
+# the main fuction to kick us off.
+
+main(){
+
+  local cmdline;
+
+  mapfile -t cmdline < <(_cmdline | tr ' ' '\n');
+
+  while getopts ":abhip" OPTION "${cmdline[@]}"; do
+
+    case $OPTION in
+      a)
+        API_KEY="YES";
+        ;;
+      b)
+        BYPASS="YES";
+        ;;
+      h)
+        _usage;
+        exit 0;
+        ;;
+      i)
+        PRINT_INFO="YES";
+        ;;
+      p)
+        FLUSH="YES";
+        ;;
+     "?")
+        echo "-${OPTARG} is not a supported option." >&2
+        ;;
+      *);;
+    esac
+  done
+
+# Set variables for the domain information
+
+  user="$(pwd | grep -Po "/(chroot/)?home/\K[^/]*")";
+  dom="$(pwd| grep -Po "/(chroot/)?home/${user}/\K[^/]*")";
+  vhost=$(find /etc/httpd/conf.d/ -type f -iname "vhost_${dom}.conf")
+
+# Set var for log file
+  _date=$(date +"%m-%d-%Y")
+  logfile="$HOME/nxvarnish-${_date}.log"
+
+# Check for a vhost with the domain name
+  if [[ -z ${vhost} ]]; then
+    echo -e "Must be in a domain directory";
+    exit 1
+  fi
+
+# Check install path for bin/magento or app/etc/env
+
+  _check_install_path
+
+# check for input or an existing api key
+
+  _check_api_input
+
+}
+
+main
