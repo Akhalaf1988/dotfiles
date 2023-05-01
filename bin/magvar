@@ -87,7 +87,8 @@ purge_varnish(){
 
 mysql_base_url_info(){
 
-  local _db _columns _table _where_clause _orderby _query
+# Define local variables
+  local _db _prefix _columns _table _where_clause _orderby _query _conf _defaults
 
 # Boolan, If set to true include path/to/php bin/magento in my_sudo function
   use_paths=false
@@ -142,6 +143,7 @@ varnish_domain_map(){
 install(){
 
   use_paths=true
+  
 # Build the Varnish args..Im trying to make the names as small as possible.
 # This way the command is not SUPER LONG!!!!!!!!!!!!!!!!
   sys_cache='system/full_page_cache/caching_application'
@@ -191,7 +193,7 @@ _check_install_path(){
   local phpv
 
 # Set php version to use for install
-  phpv=$(echo "${siteworx}" | grep "SITEWORX_PHP_VERSION" | awk '{print $2}' | cut -d/ -f4);
+  phpv=$(my_sudo php -r "echo PHP_VERSION;" | sed 's/\.//g' | cut -c 1-2);
   phpv_path="/usr/bin/${phpv}"
 
 # Set a default path for bin and env.php
@@ -294,6 +296,9 @@ check_api(){
 
 # Declare local variables
   local resp
+  
+# Define siteworx var
+  siteworx=$(sudo -u iworx /usr/local/interworx/bin/config.pex --list --siteworx "${dom}");
 
 # Extract site ID and account ID from siteworx data
   site_id=$(echo "${siteworx}" | grep 'account_id' | awk '{print $2}');
@@ -443,7 +448,6 @@ main(){
   user="$(pwd | grep -Po "/(chroot/)?home/\K[^/]*")";
   dom="$(pwd| grep -Po "/(chroot/)?home/${user}/\K[^/]*")";
   dom_check=$(find /etc/httpd/conf.d/ -type f -iname "vhost_${dom}.conf")
-  siteworx=$(sudo -u iworx /usr/local/interworx/bin/config.pex --list --siteworx "${dom}");
 
 # Set var for log file
   _date=$(date +"%m-%d-%Y")
