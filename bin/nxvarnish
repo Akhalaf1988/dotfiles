@@ -5,6 +5,7 @@
   ARGA=("$@")
   PRINT_INFO=""
   API_KEY=""
+  FLUSH=""
 
 _usage() {
 
@@ -25,7 +26,7 @@ Install Usage: nxvarnish
 EOF
 }
 
-sudo_php(){
+my_sudo(){
 
 # use_paths is a boolan value. If set to true, run the top command, else the bottom
   if [[ "$use_paths" = true ]]; then
@@ -74,11 +75,11 @@ purge_varnish(){
     -o "/dev/null"
   )
 
-# Boolan, If set to true include path/to/php bin/magento in sudo_php function
+# Boolan, If set to true include path/to/php bin/magento in my_sudo function
   use_paths=false
 
 # Send a curl request to purge the cache
-  sudo_php curl -s "${host}:${port}" "${varnish_headers[@]}"
+  my_sudo curl -s "${host}:${port}" "${varnish_headers[@]}"
   printf "done\n"
 
 }
@@ -87,12 +88,12 @@ mysql_base_url_info(){
 
   local _db _columns _table _where_clause _orderby _query
 
-# Boolan, If set to true include path/to/php bin/magento in sudo_php function
+# Boolan, If set to true include path/to/php bin/magento in my_sudo function
   use_paths=false
 
 # Grab database name from app/etc/env.php
-  _db=$(sudo_php grep -E 'dbname|DB_NAME' "${config_file}"  | cut -d \' -f 4 | head -n1)
-  _prefix=$(sudo_php grep 'table_prefix' "${config_file}"  | cut -d \' -f 4)
+  _db=$(my_sudo grep -E 'dbname|DB_NAME' "${config_file}"  | cut -d \' -f 4 | head -n1)
+  _prefix=$(my_sudo grep 'table_prefix' "${config_file}"  | cut -d \' -f 4)
 
 # We are going to need to capture domains in a multi-site so we need to use mysql
 # We are going to break down the command into smaller chunks so its not so long.
@@ -151,12 +152,12 @@ install(){
 
 # Set system/cache to 2 which should enable varnish
 
-  sudo_php config:set "${sys_cache}" 2 >> "${logfile}" 2>&1
+  my_sudo config:set "${sys_cache}" 2 >> "${logfile}" 2>&1
 
 # Set the host and port and then update the env.php file
-  sudo_php config:set "${sfv}/${beh}" "${host}" >> "${logfile}" 2>&1
-  sudo_php config:set "${sfv}/${bep}" "${port}" >> "${logfile}" 2>&1
-  sudo_php setup:config:set --http-cache-hosts="${host}:${port}" -n >> "${logfile}" 2>&1
+  my_sudo config:set "${sfv}/${beh}" "${host}" >> "${logfile}" 2>&1
+  my_sudo config:set "${sfv}/${bep}" "${port}" >> "${logfile}" 2>&1
+  my_sudo setup:config:set --http-cache-hosts="${host}:${port}" -n >> "${logfile}" 2>&1
   printf "done\n"
 
 # add to varnish domain map.
@@ -164,7 +165,7 @@ install(){
 
 # Flush magento cache
   printf "Flushing Magento cache..."
-  sudo_php cache:flush >> "${logfile}" 2>&1
+  my_sudo cache:flush >> "${logfile}" 2>&1
   printf "done\n"
 
 # Use purge_varnish function to Purge Varnish cache
@@ -190,7 +191,7 @@ _check_install_path(){
 
 
 # Set php version to use for install
-  phpv=$(sudo_php php -r "echo PHP_VERSION;" | sed 's/\.//g' | cut -c 1-2);
+  phpv=$(my_sudo php -r "echo PHP_VERSION;" | sed 's/\.//g' | cut -c 1-2);
   phpv_path="/usr/bin/${phpv}"
 
 # Set a default path for bin and env.php
@@ -215,7 +216,7 @@ _check_status(){
 # Declare local variables
   local response
 
-# use_paths is a boolan value used in sudo_php function
+# use_paths is a boolan value used in my_sudo function
 # If set to true include path/to/php bin/magento
 
   use_paths=false
@@ -223,7 +224,7 @@ _check_status(){
   printf "Checking Varnish containter status..."
 
 # Make a curl request to the provided host and port
-  response=$(sudo_php curl -s -o /dev/null -w "%{http_code}" http://"${host}:${port}")
+  response=$(my_sudo curl -s -o /dev/null -w "%{http_code}" http://"${host}:${port}")
 
 # If the response is 200, run the install function
    if [[ "${response}" -eq 200 ]]; then
