@@ -19,9 +19,7 @@ _usage() {
   cat <<- EOF
 Description: Install an Admin User and Blogvault for Migrations.
 Usage: mywp -flag(s)
-
          Supported flags:
-
           -a|--add-admin      Add admin
           -f|--flush-cache    Flush wp cache
           -h|--help           Display this message
@@ -29,15 +27,18 @@ Usage: mywp -flag(s)
           -r|--remove-admin   Remove admin
           -s|--search         Search-replace #Requires a url as an additional option
           -u|--uninstall      Uninstall Blog Vault
-
-
 EOF
 }
 
 #runs sudo -u user path/to/php7 /path/to/wp cmd
 _sudo_php(){
 
+# use_paths is a boolan value. If set to true, run the top command, else the bottom
+  if [[ "${use_paths}" = true ]]; then
   "${_sudo}" -u "${_usr}" "${_phpv}" "${_wp}" "$@"
+  else
+    "${_sudo}" -u "${_usr}" "$@"
+  fi
 
 }
 
@@ -149,7 +150,7 @@ _search_replace(){
 
     _hostname="$(_normalizedomain "${_url}")";
     _home_url="$(_sudo_php option get home "${_end_args[@]}" | awk -F '://' '{print $2}')"
-  
+
     _sudo_php search-replace "://${_home_url}" "://${_hostname}" "${_end_args[@]}"
 
 }
@@ -278,6 +279,11 @@ main () {
   fi
 
 #vars needed for adding and removing bv/admin
+
+  use_paths=false
+  phpv=$(_sudo_php php -r "echo PHP_VERSION;" | sed 's/\.//g' | cut -c 1-2);
+  phpv_path="/usr/bin/${phpv}"
+  use_paths=true
 
   _plugin_check=$(_sudo_php plugin list | grep  "${_plugin}");
   _bvactive=$(echo "${_plugin_check}" | awk '{print $2}');
