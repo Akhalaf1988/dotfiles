@@ -10,14 +10,17 @@
 #Global Variables
   _usr="$(pwd | grep -Po "/(chroot/)?home/\K[^/]*")";
   _dom="$(pwd | grep -Po "/(chroot/)?home/${_usr}/\K[^/]*")";
+  _siteworx=$(sudo -u iworx /usr/local/interworx/bin/config.pex --list --siteworx "${_dom}")
+  _phpv=$(echo "${_siteworx}" | grep "SITEWORX_PHP_VERSION" | awk '{print $2}' | cut -d '/' -f4)
   _nxu="nxmigration"
   _plugin="migrate-to-liquidweb"
 
 # Print usage
 _usage() {
   cat <<- EOF
-Description: Install an Admin User and Blogvault for Migrations.
+Description: Short-hand opts for wp commands.
 Usage: mywp -flag(s)
+
          Supported flags:
           -a|--add-admin      Add admin
           -f|--flush-cache    Flush wp cache
@@ -26,6 +29,7 @@ Usage: mywp -flag(s)
           -r|--remove-admin   Remove admin
           -s|--search         Search-replace #Requires a url as an additional option
           -u|--uninstall      Uninstall Blog Vault
+
 EOF
 }
 
@@ -33,11 +37,7 @@ EOF
 _sudo_php(){
 
 # use_paths is a boolan value. If set to true, run the top command, else the bottom
-  if [[ "${use_paths}" = true ]]; then
   "${_sudo}" -u "${_usr}" "${_phpv}" "${_wp}" "$@"
-  else
-    "${_sudo}" -u "${_usr}" "$@"
-  fi
 
 }
 
@@ -278,11 +278,6 @@ main () {
   fi
 
 #vars needed for adding and removing bv/admin
-
-  use_paths=false
-  phpvfull=$(_sudo_php php -r "echo PHP_VERSION;" | sed 's/\.//g' | cut -c 1-2);
-  phpv="/usr/bin/${phpv}"
-  use_paths=true
 
   _plugin_check=$(_sudo_php plugin list | grep  "${_plugin}");
   _bvactive=$(echo "${_plugin_check}" | awk '{print $2}');
