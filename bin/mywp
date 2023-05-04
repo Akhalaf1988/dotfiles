@@ -5,7 +5,6 @@
 
 # Alias executables to prevent PATH issues
   readonly _wp="/usr/local/bin/wp";
-  readonly _phpv="/usr/bin/php74";
   readonly _sudo="/usr/bin/sudo"
 
 #Global Variables
@@ -281,8 +280,8 @@ main () {
 #vars needed for adding and removing bv/admin
 
   use_paths=false
-  phpv=$(_sudo_php php -r "echo PHP_VERSION;" | sed 's/\.//g' | cut -c 1-2);
-  phpv_path="/usr/bin/${phpv}"
+  phpvfull=$(_sudo_php php -r "echo PHP_VERSION;" | sed 's/\.//g' | cut -c 1-2);
+  phpv="/usr/bin/${phpv}"
   use_paths=true
 
   _plugin_check=$(_sudo_php plugin list | grep  "${_plugin}");
