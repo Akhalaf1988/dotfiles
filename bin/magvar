@@ -193,7 +193,7 @@ _check_install_path(){
   local phpv
 
 # Set php version to use for install
-  phpv=$(my_sudo php -r "echo PHP_VERSION;" | sed 's/\.//g' | cut -c 1-2);
+  phpv=$(echo "${_siteworx}" | grep "SITEWORX_PHP_VERSION" | awk '{print $2}' | cut -d '/' -f4)
   phpv_path="/usr/bin/${phpv}"
 
 # Set a default path for bin and env.php
