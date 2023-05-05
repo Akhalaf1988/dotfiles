@@ -76,7 +76,7 @@ pick_php_version(){
         read -r -p "Select a Number: " option
         if ((option >= 1 && option <= ${#versions[@]})); then
             version="${versions[option-1]}"
-            echo "You Selected PHP ${version}."
+            echo "You Selected PHP ${version}"
             phpv="${version}"
             break
         else
@@ -105,15 +105,15 @@ check_php_input(){
          )
 
 # Check if value is in the allowed list and if not go to pick_php_version to choose one
-  if [[ ! " ${allowed_values[@]} " =~ " ${phpv} " ]]; then
-    printf "Not an excepted php version!\n"
+  if [[ ! " ${allowed_values[*]} " =~  ${phpv} ]]; then
+    printf "Not an excepted PHP version!\n"
     pick_php_version
   fi
 
 # Replace the input value with its corresponding value in the allowed values list
-  phpv=$(echo "${phpv}" | sed 's/\.//')
+  phpv="${phpv/\./}"
   for value in "${allowed_values[@]}"; do
-    value=$(echo "${value}" | sed 's/\.//')
+    value="${value/\./}"
     if [[ "${phpv}" == "${value}" ]]; then
       phpv="${value:0:1}.${value:1}"
       break
@@ -155,19 +155,18 @@ check_api_key(){
      printf "%skey not valid ${resp}\n";
      exit 1
   fi
-
-
 }
 
 # Function to prompt the user for an API token
 prompt_for_api_token () {
-    read -r -p "Enter API token: " api_token
-    if [[ -n "${api_token}" ]]; then
-        NWTOKEN="${api_token}"
-    else
-        printf "Error: API token cannot be empty\n"
-        prompt_for_api_token
-    fi
+
+  read -r -p "Enter API token: " api_token
+  if [[ -n "${api_token}" ]]; then
+      NWTOKEN="${api_token}"
+  else
+      printf "Error: API token cannot be empty\n"
+      prompt_for_api_token
+  fi
 }
 
 
@@ -245,12 +244,12 @@ main(){
   fi
 
 # Check if api key is valid by hitting a test endpoint.
-  printf "\nStarting Preflight Checks..."
+  printf "\nStarting preflight checks..."
   check_api_key
   printf "done\n"
 
 # switch php version with an api call using the key given
- printf "Changing PHP Version...Please Wait..."
+ printf "Changing PHP version...please wait..."
   switch_php
 
 }
