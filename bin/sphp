@@ -9,7 +9,7 @@ _usage() {
   cat <<- EOF
 
 Description: Switchphp Tool For Nexcess Cloud Servers.
-Usage: cloudphp -p 72
+Usage: sphp -p 72
 
    Optional Arguments:
 
