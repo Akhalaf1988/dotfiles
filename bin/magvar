@@ -11,18 +11,16 @@ _usage() {
 
 # Print help
   cat <<- EOF
+Description: Varnish Tool for Nexcess Cloudhost Servers.
 
-Description: Varnish Tool for Nexcess Cloudhost Servers. 
 Usage: nxvarnish
-Api-Usage: nxvarnish -a
+Api-Usage: nxvarnish -ai
 
    Optional Arguments:
-
      -a|--api     Prompt For an Api-Token
      -h|--help    Display This Message
      -i|--info    Print Varnish Info If Api-Token Is Set
      -p|--purge   Purge Varnish Cache
-
 
 EOF
 }
@@ -134,6 +132,7 @@ varnish_domain_map(){
 # Loop against it and if that domain is not in varnish-domainmap.conf add it
   for domain in "${domains[@]}"; do
     if ! grep -q "${domain}" "/etc/nginx/conf.d/varnish-domainmap.conf"; then
+#shellcheck disable=SC2024
       sudo enable-varnish-secondary.sh "${user}" "${domain}" >> "${logfile}" 2>&1
     fi
   done
@@ -143,7 +142,7 @@ varnish_domain_map(){
 install(){
 
   use_paths=true
-  
+
 # Build the Varnish args..Im trying to make the names as small as possible.
 # This way the command is not SUPER LONG!!!!!!!!!!!!!!!!
   sys_cache='system/full_page_cache/caching_application'
@@ -154,7 +153,7 @@ install(){
   printf "Installing Varnish and setting env.php..."
 
 # Set system/cache to 2 which should enable varnish
-
+#shellcheck disable=SC2129
   my_sudo config:set "${sys_cache}" 2 >> "${logfile}" 2>&1
 
 # Set the host and port and then update the env.php file
@@ -191,10 +190,6 @@ _check_install_path(){
 
 # define local variables
   local phpv
-
-# Set php version to use for install
-  phpv=$(echo "${_siteworx}" | grep "SITEWORX_PHP_VERSION" | awk '{print $2}' | cut -d '/' -f4)
-  phpv_path="/usr/bin/${phpv}"
 
 # Set a default path for bin and env.php
   magento_path="bin/magento"
@@ -296,9 +291,13 @@ check_api(){
 
 # Declare local variables
   local resp
-  
+
 # Define siteworx var
   siteworx=$(sudo -u iworx /usr/local/interworx/bin/config.pex --list --siteworx "${dom}");
+
+# Set php version to use for install
+  phpv=$(echo "${siteworx}" | grep "SITEWORX_PHP_VERSION" | awk '{print $2}' | cut -d '/' -f4)
+  phpv_path="/usr/bin/${phpv}"
 
 # Extract site ID and account ID from siteworx data
   site_id=$(echo "${siteworx}" | grep 'account_id' | awk '{print $2}');
@@ -344,10 +343,10 @@ get_host(){
 
   while [[ -z "${host}" || -z "${port}" ]]; do
       if [[ -z "${host}" ]]; then
-          read -p "Host is missing. Enter host: " host
+          read -r -p "Host is missing. Enter host: " host
       fi
       if [[ -z "${port}" ]]; then
-          read -p "Port is missing. Enter port: " port
+          read -r -p "Port is missing. Enter port: " port
       fi
   done
 
@@ -435,7 +434,7 @@ main(){
         ;;
       p)
         FLUSH="YES";
-        ;;        
+        ;;
      "?")
         echo "-${OPTARG} is not a supported option." >&2
         ;;
@@ -468,5 +467,4 @@ main(){
   _check_api_input
 
 }
-
 main
