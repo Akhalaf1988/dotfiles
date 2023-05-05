@@ -55,7 +55,7 @@ switch_php(){
       break
     elif [[ "${php_status}" == "failure" ]]; then
       printf "done\n"
-      printf "%sPHP Version Switch failed\n"
+      printf "PHP Version Switch failed\n"
       break
     fi
   done
