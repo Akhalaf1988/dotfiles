@@ -106,7 +106,7 @@ check_php_input(){
 
 # Check if value is in the allowed list and if not go to pick_php_version to choose one
   if [[ ! " ${allowed_values[*]} " =~  ${phpv} ]]; then
-    printf "Not an excepted PHP version!\n"
+    printf "Not an accepted PHP version!\n"
     pick_php_version
   fi
 
