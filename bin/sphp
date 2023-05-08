@@ -3,6 +3,20 @@
 # Script Arguments
   ARGA=("$@")
 
+# Define allowed php values
+  allowed_values=(
+      "5.6" "56"
+      "7.0" "70"
+      "7.1" "71"
+      "7.2" "72"
+      "7.3" "73"
+      "7.4" "74"
+      "8.0" "80"
+      "8.1" "81"
+         )
+
+    versions=("5.6" "7.0" "7.1" "7.2" "7.3" "7.4" "8.0" "8.1")
+
 _usage() {
 
 # Print help
@@ -64,9 +78,6 @@ switch_php(){
 
 pick_php_version(){
 
-# Define allowed values
-    versions=("5.6" "7.0" "7.1" "7.2" "7.3" "7.4" "8.0" "8.1")
-
 # This while loop displays the list of PHP versions above and asks the user to select a number corresponding to the desired PHP version. If the user selects a valid number, the corresponding PHP version is stored in the phpv variable and the loop exits. If the user selects an invalid number, an error message is displayed and the loop continues until a valid selection is made.
 
     while true; do
@@ -91,18 +102,6 @@ check_php_input(){
   if [[ -z "${phpv}" ]]; then
       pick_php_version
   fi
-
-# Define allow values
-  allowed_values=(
-      "5.6" "56"
-      "7.0" "70"
-      "7.1" "71"
-      "7.2" "72"
-      "7.3" "73"
-      "7.4" "74"
-      "8.0" "80"
-      "8.1" "81"
-         )
 
 # Check if value is in the allowed list and if not go to pick_php_version to choose one
   if [[ ! " ${allowed_values[*]} " =~  ${phpv} ]]; then
@@ -222,6 +221,11 @@ main(){
       *);;
     esac
   done
+
+  if [[ ! $(hostname) =~ cloudhost ]]; then
+      printf "sphp is only available on Nexcess Cloud Servers\n";
+      exit 1;
+  fi
 
 # Set variables for the domain information
 
