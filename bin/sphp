@@ -34,10 +34,10 @@ EOF
 switch_php(){
 
 
-# Remove the elements we don't want
+# Remove the elements for headers array we don't want
   headers=("${headers[@]:0:2}")
 
-# Add new headers to the existing headers array
+# Add new headers to the existing array
   headers+=(
     -H "Content-type: application/json"
     -d "{\"php_version\":\"${phpv}\", \"skip_compatibility_check\":\"true\"}"
@@ -56,6 +56,7 @@ switch_php(){
 # remove the -d header from the array
   headers=("${headers[@]:0:2}")
 
+# While true loop to check the task uri status
   while true; do
     php_status=$(curl -s "${api_url}/${acc_id}${task_uri}" "${headers[@]}" | jq -r '.status')
 
@@ -76,10 +77,7 @@ switch_php(){
 
 pick_php_version(){
 
-# This while loop displays the list of PHP versions above and asks the user to select a number corresponding to the desired PHP version. 
-# If the user selects a valid number, the corresponding PHP version is stored in the phpv variable and the loop exits. 
-# If the user selects an invalid number, an error message is displayed and the loop continues until a valid selection is made.
-
+# Set a new array for allowed php values, basically just grabbing every other value in allowed_versions which would endup being the X.X versions
 versions=()
 
   for (( i=0; i<${#allowed_versions[@]}; i+=2 )); do
@@ -88,6 +86,10 @@ versions=()
       versions+=("${version}")
     fi
   done
+
+# This while loop displays the list of PHP versions above and asks the user to select a number corresponding to the desired PHP version. 
+# If the user selects a valid number, the corresponding PHP version is stored in the phpv variable and the loop exits. 
+# If the user selects an invalid number, an error message is displayed and the loop continues until a valid selection is made.
 
   while true; do
       for i in "${!versions[@]}"; do
@@ -155,6 +157,7 @@ check_api_key(){
 
 # Check reponse code. If not 200 get host and port info
 # Else try to get the container info with api info
+
   if [[ "${resp}" -ne 200 ]]; then
      printf "%skey not valid ${resp}\n";
      exit 1
@@ -175,7 +178,6 @@ prompt_for_api_token () {
 
 
 # Convert long command line options into short ones for getopts
-
 _cmdline() {
 
   local x;
