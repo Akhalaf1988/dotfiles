@@ -76,7 +76,9 @@ switch_php(){
 
 pick_php_version(){
 
-# This while loop displays the list of PHP versions above and asks the user to select a number corresponding to the desired PHP version. If the user selects a valid number, the corresponding PHP version is stored in the phpv variable and the loop exits. If the user selects an invalid number, an error message is displayed and the loop continues until a valid selection is made.
+# This while loop displays the list of PHP versions above and asks the user to select a number corresponding to the desired PHP version. 
+# If the user selects a valid number, the corresponding PHP version is stored in the phpv variable and the loop exits. 
+# If the user selects an invalid number, an error message is displayed and the loop continues until a valid selection is made.
 
 versions=()
 
