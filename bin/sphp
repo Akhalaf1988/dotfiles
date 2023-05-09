@@ -34,10 +34,11 @@ EOF
 switch_php(){
 
 
-# Remove the elements for headers array we don't want
+# Remove the elements for headers array we don't want from existing array in check_api
+# should remove -w "%{http_code}" and -o "/dev/null"
   headers=("${headers[@]:0:2}")
 
-# Add new headers to the existing array
+# Add new headers to the existing array specifically for the POST request
   headers+=(
     -H "Content-type: application/json"
     -d "{\"php_version\":\"${phpv}\", \"skip_compatibility_check\":\"true\"}"
@@ -50,7 +51,6 @@ switch_php(){
   php_curl=$(curl -sX POST "${api_url}/${php_endpoint}" "${headers[@]}")
 
 # Kick off the php version change and grab the task uri
-
   task_uri=$(echo "${php_curl}" | jq -r '.metadata.uri')
 
 # remove the -d header from the array
