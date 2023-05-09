@@ -4,18 +4,16 @@
   ARGA=("$@")
 
 # Define allowed php values
-  allowed_values=(
-      "5.6" "56"
-      "7.0" "70"
-      "7.1" "71"
-      "7.2" "72"
-      "7.3" "73"
-      "7.4" "74"
-      "8.0" "80"
-      "8.1" "81"
-         )
-
-    versions=("5.6" "7.0" "7.1" "7.2" "7.3" "7.4" "8.0" "8.1")
+allowed_versions=(
+    "5.6" "56"
+    "7.0" "70"
+    "7.1" "71"
+    "7.2" "72"
+    "7.3" "73"
+    "7.4" "74"
+    "8.0" "80"
+    "8.1" "81"
+  )
 
 _usage() {
 
@@ -80,45 +78,50 @@ pick_php_version(){
 
 # This while loop displays the list of PHP versions above and asks the user to select a number corresponding to the desired PHP version. If the user selects a valid number, the corresponding PHP version is stored in the phpv variable and the loop exits. If the user selects an invalid number, an error message is displayed and the loop continues until a valid selection is made.
 
-    while true; do
-        for i in "${!versions[@]}"; do
-            echo "$((i+1))) ${versions[i]}"
-        done
-        read -r -p "Select a Number: " option
-        if ((option >= 1 && option <= ${#versions[@]})); then
-            version="${versions[option-1]}"
-            echo "You Selected PHP ${version}"
-            phpv="${version}"
-            break
-        else
-            echo "Invalid Selection. Please Choose a Number From The List."
-        fi
-    done
+versions=()
+
+  for (( i=0; i<${#allowed_versions[@]}; i+=2 )); do
+    version="${allowed_versions[$i]}"
+    if [[ "${version}" == *"."* ]]; then
+      versions+=("${version}")
+    fi
+  done
+
+  while true; do
+      for i in "${!versions[@]}"; do
+          echo "$((i+1))) ${versions[i]}"
+      done
+      read -r -p "Select a Number: " option
+      if ((option >= 1 && option <= ${#versions[@]})); then
+          version="${versions[option-1]}"
+          echo "You Selected PHP ${version}"
+          phpv="${version}"
+          break
+      else
+          echo "Invalid Selection. Please Choose a Number From The List."
+      fi
+  done
 
 }
 
 check_php_input(){
 
-  if [[ -z "${phpv}" ]]; then
-      pick_php_version
-  fi
+# Check if the user input matches any of the allowed versions
 
-# Check if value is in the allowed list and if not go to pick_php_version to choose one
-  if [[ ! " ${allowed_values[*]} " =~  ${phpv} ]]; then
+if [[ ! " ${allowed_versions[*]} " == *" $phpv "* ]]; then
     printf "Not an accepted PHP version!\n"
     pick_php_version
-  fi
+fi
 
 # Replace the input value with its corresponding value in the allowed values list
   phpv="${phpv/\./}"
-  for value in "${allowed_values[@]}"; do
+  for value in "${allowed_versions[@]}"; do
     value="${value/\./}"
     if [[ "${phpv}" == "${value}" ]]; then
       phpv="${value:0:1}.${value:1}"
       break
     fi
   done
-
 }
 
 check_api_key(){
@@ -239,10 +242,14 @@ main(){
     exit 1
   fi
 
-# Once we check if the api key is valid we need to check what they added for php version
-  check_php_input;
+# Check for input on php version
+  if [[ -z "${phpv}" ]]; then
+      pick_php_version;
+   else
+      check_php_input;
+  fi
 
-# prompt for api-key if NWTOKEN is not set
+## prompt for api-key if NWTOKEN is not set
   if [[ -z "${NWTOKEN}" ]]; then
       prompt_for_api_token
   fi
