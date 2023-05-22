@@ -1,0 +1,352 @@
+#! /usr/bin/env bash
+
+# Script Arguments
+
+  ARGA=("$@")
+  RABBITMQ=""
+  PHPMYADMIN=""
+  ELASTIC=""
+  CDN=""
+  SITEWORX=""
+  VARNISH=""
+
+_usage() {
+
+# Print help
+  cat <<- EOF
+Description: Fetch Service Info From Portal.
+
+Usage: metafetch --all
+
+   Optional Arguments:
+     -a|--all         Show all Container Info
+     -c|--cdn         CDN Info
+     -e|--elastic     Elastic-Search Info
+     -h|--help        Display This Message
+     -p|--phpmyadmin  Phpmyadmin Url
+     -r|--rabbitmq    RabbitMQ Info
+     -s|--siteworx    Siteworx Control Panel Url
+     -v|--varnish     Varnish Info
+
+         -d|--deep    Extract Additional Info
+
+EOF
+}
+
+
+rabbitmq(){
+  service="RabbitMQ"
+  get_service_info "rabbit"
+
+}
+
+elastic(){
+  service="Elastic"
+  get_service_info "elastic"
+
+}
+
+varnish() {
+  service="Varnish"
+  get_service_info "varnish"
+
+}
+
+cdns(){
+
+  cdn_url=$(curl -s "${api_url}/${acc_id}/v1/site/${site_id}/eadn" "${headers[@]}" | jq -r '.base_access_uri');
+  cdn_usage=$(curl -s "${api_url}/${acc_id}/v1/site/${site_id}/eadn/usage" "${headers[@]}");
+  cdn_domain=$(echo "${cdn_usage}" | jq -r '.site.identity')
+
+  printf "\n"
+  printf "%-15s:\n" "CDN Info"
+  printf "%-15s: %-4s\n" "Hostname" "${cdn_url}"
+  printf "%-15s: %-4s\n" "Domain" "${cdn_domain}"
+
+  if [[ "${DEEP}" == "YES" ]]; then
+      cdn_total=$(echo "${cdn_usage}" | jq -r '.usage.used.total')
+      cdn_overage=$(echo "${cdn_usage}" | jq -r '.usage.used.overage')
+      cdn_cost=$(echo "${cdn_usage}" | jq -r '.usage.used.cost')
+      printf "%-15s: %-4s\n" "Use" "${cdn_total}"
+      printf "%-15s: %-4s\n" "Overage" "${cdn_overage}"
+      printf "%-15s: %-4s\n" "Cost" "${cdn_cost}"
+  fi
+
+}
+
+siteworx_url(){
+
+  local siteworxurl
+
+  siteworxurl=$(curl -s "${api_url}/${acc_id}/v1/site/${site_id}/sso-url" "${headers[@]}" | jq -r '.siteworx_url');
+  printf "\n"
+  printf "%-4s: %-4s\n" "Control Panel" "${siteworxurl}"
+  printf "\n"
+
+}
+
+phpmyadmin(){
+  local phpmyadmin_url
+
+  phpmyadmin_url=$(curl -s "${api_url}/${acc_id}/v1/site/${site_id}/sso-url" "${headers[@]}" | jq -r '.phpmyadmin_url');
+
+  printf "\n"
+  printf "%-4s: %-4s\n" "phpMyAdmin" "${phpmyadmin_url}"
+  printf "\n"
+
+}
+
+get_service_info() {
+
+  local service_type="$1" port_sel version_sel addon_sel addon_uri addon_curl
+
+  host_sel='.[] | select(.type.identity | contains("'"${service_type}"'"))'
+  host_main=$(echo "${container_curl}" | jq -r "${host_sel} | .identity")
+  port_sel="${host_sel} | .ports[0].publish_port"
+  version_sel="${host_sel} | .version"
+  addon_sel="${host_sel} | .addon.metadata.uri"
+
+  version_unmod=$(echo "${container_curl}" | jq -r "${version_sel}");
+  host="${host_main}.nxcli.net"
+  port=$(echo "${container_curl}" | jq -r "${port_sel}");
+  addon_uri=$(echo "${container_curl}" | jq -r "${addon_sel}")
+
+  if [[ -z "${host_main}" ]]; then
+      printf "\n%s\n" "${service} is not enabled!"
+  else
+      printf "\n"
+      printf "%-15s:\n" "${service} Info"
+      printf "%-15s: %-4s\n" "Host" "${host}"
+      printf "%-15s: %-4s\n" "Port" "${port}"
+      printf "%-15s: %-4s\n" "Version" "${version_unmod}"
+  fi
+  if [[ "${DEEP}" == "YES" && -n "${host}" ]]; then
+      addon_curl=$(curl -s "${api_url}/${acc_id}${addon_uri}" "${headers[@]}");
+      addon_service=$(echo "${addon_curl}" | jq -r '.identity')
+      addon_cpu=$(echo "${addon_curl}" | jq -r '.configuration.cpu')
+      addon_memory=$(echo "${addon_curl}" | jq -r '.configuration.memory')
+      addon_disk=$(echo "${addon_curl}" | jq -r '.configuration.disk')
+
+      printf "%-15s: %-4s\n" "Size" "${addon_service}"
+      printf "%-15s: %-4s\n" "CPU" "${addon_cpu}"
+      printf "%-15s: %-4s\n" "Memory" "${addon_memory}"
+      printf "%-15s: %-4s\n" "Disk Space" "${addon_disk}"
+  fi
+
+
+}
+
+
+check_api_key(){
+
+# Declare local variables
+  local resp test_endpoint
+
+# set headers for the request
+  headers=(
+    -H "Authorization: Bearer ${NWTOKEN}"
+    -H "Accept: application/json"
+    -w "%{http_code}"
+    -o "/dev/null"
+  )
+
+# Set API URL and container endpoint
+  api_url='https://nocworx.nexcess.net/api/v1/as-client'
+  test_endpoint="${acc_id}/v1/client/self"
+
+# Send curl to check api response
+  resp=$(curl --silent "${api_url}/${test_endpoint}" "${headers[@]}");
+
+# Check reponse code. If not 200 get host and port info
+# Else try to get the container info with api info
+  if [[ "${resp}" -ne 200 ]]; then
+     printf "%skey not valid ${resp}\n";
+     exit 1
+  fi
+
+# set new header
+  headers=("${headers[@]:0:4}" "${headers[@]:8}")
+
+}
+
+traffic_light(){
+
+  case "${ALL}" in
+      YES)
+          elastic
+          varnish
+          rabbitmq
+          cdns
+          phpmyadmin
+          siteworx_url
+          ;;
+      *)
+          [[ "${ELASTIC}" == "YES" ]] && elastic
+          [[ "${VARNISH}" == "YES" ]] && varnish
+          [[ "${RABBITMQ}" == "YES" ]] && rabbitmq
+          [[ "${CDN}" == "YES" ]] && cdns
+          [[ "${PHPMYADMIN}" == "YES" ]] && phpmyadmin
+          [[ "${SITEWORX}" == "YES" ]] && siteworx_url
+         ;;
+  esac
+}
+
+get_domain_info(){
+
+# Define domain and user
+  user="$(pwd | grep --color=auto -Po "/(chroot/)?home/\K[^/]*")";
+  dom="$(pwd| grep --color=auto -Po "/(chroot/)?home/${user}/\K[^/]*")";
+
+# check if existing path has a vhost for domain
+  domchk=$(find /etc/httpd/conf.d/ -type f -iname "vhost_${dom}.conf")
+
+  if [[ -z ${domchk} ]]; then
+    printf "Must be in a domain directory"
+    exit 1
+  fi
+
+# Define siteworx
+  config_pex='/usr/local/interworx/bin/config.pex'
+  siteworx=$(sudo -u iworx "${config_pex}" --list --siteworx "${dom}");
+
+# Extract site ID and account ID from siteworx data
+  site_id=$(echo "${siteworx}" | grep 'account_id' | awk '{print $2}');
+  acc_id=$(echo "${siteworx}" | grep '^client_id' | awk '{print $2}');
+
+}
+
+# Function to prompt the user for an API token
+prompt_for_api_token () {
+
+  read -r -p "Enter API token: " api_token
+  if [[ -n "${api_token}" ]]; then
+      NWTOKEN="${api_token}"
+  else
+      printf "Error: API token cannot be empty\n"
+      prompt_for_api_token
+  fi
+}
+
+# Convert long command line options into short ones for getopts
+_cmdline() {
+
+  local x;
+
+  for x in "${ARGA[@]}"; do
+
+    case "$x" in
+     "--all"|"-a")
+        args="${args}-a "
+        ;;
+     "--cdn"|"-c")
+        args="${args}-c "
+        ;;
+     "--deep"|"-d")
+        args="${args}-d "
+        ;;
+     "--elastic"|"-e")
+        args="${args}-e "
+        ;;
+     "--help"|"-h")
+        args="${args}-h "
+        ;;
+     "--phpmyadmin"|"-p")
+        args="${args}-p "
+        ;;
+     "--rabbitmq"|"-r")
+        args="${args}-r "
+        ;;
+     "--siteworx"|"-s")
+        args="${args}-s "
+        ;;
+     "--varnish"|"-v")
+        args="${args}-v "
+        ;;
+     "--"*)
+        echo "$x is not a supported option." >&2
+        ;;
+      *)
+        args="${args}${x} "
+        ;;
+    esac
+  done
+
+  echo "$args";
+
+}
+
+# the main fuction to kick us off.
+
+main(){
+
+  local cmdline;
+
+  mapfile -t cmdline < <(_cmdline | tr ' ' '\n');
+
+  while getopts ":acdehprsv" OPTION "${cmdline[@]}"; do
+
+    case $OPTION in
+      a)
+        ALL="YES";
+        ;;
+      c)
+        CDN="YES";
+        ;;
+      d)
+        DEEP="YES";
+        ;;
+      e)
+        ELASTIC="YES";
+        ;;
+      h)
+        _usage;
+        exit 0;
+        ;;
+      p)
+        PHPMYADMIN="YES";
+        ;;
+      r)
+        RABBITMQ="YES";
+        ;;
+      s)
+        SITEWORX="YES";
+        ;;
+      v)
+        VARNISH="YES";
+        ;;
+     "?")
+        echo "-${OPTARG} is not a supported option." >&2
+        ;;
+      *);;
+    esac
+  done
+
+  if [[ ! $(hostname) =~ cloudhost || $(hostname) =~ saashost ]]; then
+      printf "metafetch is only available on Nexcess Cloud and Saas Servers\n";
+      exit 1;
+  fi
+
+# Get siteid and account id info
+  get_domain_info
+
+# prompt for api-key if NWTOKEN is not set
+  if [[ -z "${NWTOKEN}" ]]; then
+      prompt_for_api_token
+  fi
+
+# Check if api key is valid by hitting a test endpoint.
+  check_api_key
+
+# only get container info if container is called on
+  case "${RABBITMQ}|${ELASTIC}|${VARNISH}|${ALL}" in
+      *"YES"*)
+    container_curl=$(curl -s "${api_url}/${acc_id}/v1/site/${site_id}/container" "${headers[@]}");
+          ;;
+  esac
+
+# This should direct to correct function base on input
+  printf "Site Details:\n"
+  traffic_light
+}
+
+main
