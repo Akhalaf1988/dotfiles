@@ -1,0 +1,315 @@
+#! /usr/bin/env bash
+
+# Script Arguments
+
+  ARGA=("$@")
+
+_usage() {
+
+# Print help
+  cat <<- EOF
+
+Description: Install redis on Cloudhost servers.
+Use: nxredis -cs
+
+   Optional Arguments:
+
+     -c|--cache      Enable Redis Full Page and Backend
+     -h|--help       Display this message
+     -i|--info       Print Redis Info
+     -s|--sessions   Enable Redis Sessions
+
+EOF
+}
+
+my_sudo(){
+
+# use_paths is a boolan value. If set to true, run the top command, else the bottom
+  if [[ "$use_paths" = true ]]; then
+    sudo -u "${user}" "${phpv_path}" "${magento_path}" "$@"
+  else
+    sudo -u "${user}" "$@"
+  fi
+
+}
+
+install(){
+
+# Need to check php version to set correct compression lib
+  php81=$(my_sudo php -r "echo PHP_VERSION;" | grep ^8.1)
+
+# Set default compression
+  compression="snappy";
+  if [[ -z "${php81}" ]]; then
+      compression="gzip"
+  fi
+
+# Set temp date
+  _date=$(date +".%Y%m%d_%H%M%S")
+
+# Back up env.php
+  my_sudo cp -a "${config_file}"{,$_date}
+  printf "%s" "env.php backed up as: env.php${_date}\n"
+
+# boolan for my_sudo. Use bin/magento
+  use_paths=true
+
+# Build bin/magento args, ugly but not as ugly as the long command it could have been :D
+
+  backend_args=(
+    "--cache-backend=redis"
+    "--cache-backend-redis-server=${host}"
+    "--cache-backend-redis-port=${port}"
+    "--cache-backend-redis-db=${_db1}"
+    "--cache-backend-redis-compression-lib=${compression}"
+  )
+  page_cache_args=(
+    "--page-cache=redis"
+    "--page-cache-redis-server=${host}"
+    "--page-cache-redis-port=${port}"
+    "--page-cache-redis-db=${_db2}"
+    "--page-cache-redis-compress-data=1"
+    "--page-cache-redis-compression-lib=${compression}"
+  )
+  session_args=(
+    "--session-save=redis"
+    "--session-save-redis-host=${host}"
+    "--session-save-redis-port=${port}"
+    "--session-save-redis-db=${_db3}"
+    "--session-save-redis-log-level=4"
+    "--session-save-redis-max-concurrency=20"
+    "--session-save-redis-compression-lib=${compression}"
+  )
+
+  if [[ "${CACHE}" == "YES" && "${SESSIONS}" != "YES" ]]; then
+      printf "Installing Redis Cache"
+      my_sudo setup:config:set "${backend_args[@]}" -q
+      my_sudo setup:config:set "${page_cache_args[@]}" -q
+  elif [[ "${CACHE}" != "YES" && "${SESSIONS}" == "YES" ]]; then
+        printf "Installing Redis Sessions"
+        my_sudo setup:config:set "${session_args[@]}" -n -q
+  else
+     printf "Installing Redis Cache + Sessions"
+     my_sudo setup:config:set "${backend_args[@]}" -q
+     my_sudo setup:config:set "${page_cache_args[@]}" -q
+     my_sudo setup:config:set "${session_args[@]}" -n -q
+  fi
+}
+
+check_open_dbs(){
+
+# Define local variables
+ local grep_cut db_last
+# Next we need to check available dbs
+# We will first grab the last db in the list and then set the numbers from there
+
+  grep_cut='grep "^db" | cut -d: -f1 | cut -c3- | tail -n1'
+  db_last=$(my_sudo redis-cli "${rcli_args[@]}" info keyspace | eval "${grep_cut}")
+  if [[ "${db_last}" -ge 10 ]]; then
+     printf "Not Enough dbs left to configure"
+     exit 1
+  else
+     _db1=$((${db_last}+1))
+     _db2=$((${db_last}+2))
+     _db3=$((${db_last}+3))
+     printf "%sSystem Cache backend: db${_db1}\n"
+     printf "%sPage cache backend: db${_db2}\n"
+     printf "%sSession backend: db${_db3}\n"
+     install
+  fi
+}
+get_redis_stats(){
+
+# Define local variables
+  local grep_args grepv_args grep_run
+
+# Set variables
+
+  grep_arg='uptime|human|evict|^db'
+  grepV_arg='system|lua|rss|seconds|scripts|mem_not|exceeded'
+  grep_run='grep -E ${grep_arg} | grep -Ev ${grepV_arg}'
+  redis_info=$(my_sudo redis-cli "${rcli_args[@]}" info)
+
+  redis_stats=$(echo "${redis_info}" | eval "${grep_run}" | sed -e 's/_human//g' -e 's/\r//g');
+
+  # Print header
+  printf "+-------------------------------------------+\n"
+  printf "|                 Redis Info                | \n"
+  printf "+-------------------------------------------+\n"
+
+  printf "%-20s: %-4s\n" "Owner" "${user}";
+  printf "%-20s: %-4s\n" "Socket" "${connection_info}";
+  # Print redis stats
+  while read -r line; do
+    _key=$(echo "${line}" | cut -d':' -f1)
+    _value=$(echo "${line}" | cut -d':' -f2)
+    printf "%-20s: %s\n" "${_key}" "${_value}"
+  done <<< "${redis_stats}"
+  printf "%-20s: %-4s\n" "Config" "${conf}";
+  printf "%-20s: %-4s\n" "Log file" "${logfile}";
+  printf "%-20s: %-4s\n" "Pid file" "${pidfile}\n";
+
+}
+
+get_redis_host(){
+
+# Define local variables
+  local _redis_confs
+
+# Find redis config file
+  redis_confs=($(find /etc/redis-multi/ -type f -iname "*${user}*.conf"));
+
+#
+  for conf in "${redis_confs[@]}";
+  do
+      port="$(grep "^port" "${conf}" |awk '{print $2}')";
+      host="$(grep bind "${conf}" | awk '{print $2}')";
+      logfile="$(grep logfile "${conf}" | awk '{print $2}')";
+      pidfile="$(grep pidfile "${conf}" | awk '{print $2}')";
+
+      if [[ "${host}" == "0.0.0.0" || "${port}" == "0" ]]; then
+          host="$(grep unixsocket "${conf}" | head -n1 | awk '{print $2}')";
+          connection_info="${host}";
+          rcli_args=("-s" "${host}");
+          port="0"
+      else
+          connection_info="${host}:${port}";
+          rcli_args=("-h" "${host}" "-p" "${port}");
+      fi
+  done
+
+# boolan for my_sudo
+  use_paths=false
+
+# Check if they just want info else continue with install
+  if [[ "${PRINT_INFO}" == "YES" ]]; then
+     get_redis_stats
+  else
+     check_open_dbs
+  fi
+
+}
+
+
+_check_install_path(){
+
+# define local variables
+  local phpv
+
+# Set php version to use for install
+  phpv=$(echo "${siteworx}" | grep "SITEWORX_PHP_VERSION" | awk '{print $2}' | cut -d/ -f4);
+  phpv_path="/usr/bin/${phpv}"
+
+# Set a default path for bin and env.php
+  magento_path="bin/magento"
+  config_file="app/etc/env.php"
+
+# check default path, if it does not exist check parent directory
+  if [[ ! -e "${magento_path}" && ! -e "${config_file}" ]]; then
+      magento_path="../bin/magento"
+      config_file="../app/etc/env.php"
+      app_cms='2'
+  fi
+  if [[ ! -e "${magento_path}" && ! -e "${config_file}" ]]; then
+      config_file="app/etc/env.php"
+      app_cms='1'
+  fi
+  if [[ ! -e "${magento_path}" ]]; then
+      printf "Error: Main Magento install not found in current or parent directory!"
+      exit 1
+  fi
+
+# Get host and port info
+
+  get_redis_host
+
+}
+
+# Convert long command line options into short ones for getopts
+
+_cmdline() {
+
+  local x;
+
+  for x in "${ARGA[@]}"; do
+
+    case "$x" in
+     "--cache"|"-c")
+        args="${args}-c "
+        ;;
+     "--help"|"-h")
+        args="${args}-h "
+        ;;
+     "--info"|"-i")
+        args="${args}-i "
+        ;;
+     "--sessions"|"-s")
+        args="${args}-s "
+        ;;
+      "--"*)
+        echo "$x is not a supported option." >&2
+        ;;
+      *)
+        args="${args}${x} "
+        ;;
+    esac
+  done
+
+  echo "$args";
+
+}
+
+
+main(){
+
+  local cmdline;
+
+  mapfile -t cmdline < <(_cmdline | tr ' ' '\n');
+
+  while getopts ":chis" OPTION "${cmdline[@]}"; do
+
+    case $OPTION in
+      c)
+        CACHE="YES";
+        ;;
+      h)
+        _usage;
+        exit 0;
+        ;;
+      i)
+        PRINT_INFO="YES";
+        ;;
+      s)
+        SESSIONS="YES";
+        ;;
+     "?")
+        echo "-${OPTARG} is not a supported option." >&2
+        ;;
+      *);;
+    esac
+  done
+
+# Set variables for the domain information
+
+  user="$(pwd | grep -Po "/(chroot/)?home/\K[^/]*")";
+  dom="$(pwd| grep -Po "/(chroot/)?home/${user}/\K[^/]*")";
+  dom_check=$(find /etc/httpd/conf.d/ -type f -iname "vhost_${dom}.conf")
+  siteworx=$(sudo -u iworx /usr/local/interworx/bin/config.pex --list --siteworx "${dom}");
+
+# Set var for log file
+  _date=$(date +"%m-%d-%Y")
+  logfile="$HOME/nxredis-${_date}.log"
+
+# Check for a vhost with the domain name
+  if [[ -z ${dom_check} ]]; then
+    echo -e "Must be in a domain directory";
+    exit 1
+  fi
+
+# Check install path for bin/magento or app/etc/env
+
+  _check_install_path
+
+}
+
+main
