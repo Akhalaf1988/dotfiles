@@ -1,0 +1,603 @@
+#! /usr/bin/env bash
+###Created by Abe k for MA to MA migrations##
+##TODO
+# 1 if we are to add cluster info we need to adjust for db host in env section
+# 2 need to check for pub symlinks and unset
+# 4 Add a check for mysql version compatibility ex mysql 8 to mariadb 10.5, might need to sed replace encoding.
+# 5 add a check for custom symlinks for media or env.
+# 6. add a check for shared folder
+# 7. add site copy for dev sites.
+# 8. Add a check to make sure that folder is empty before inistal sync.
+
+# Script Arguments
+  readonly ARGA=("$@")
+  SYNC=''
+  DATABASE=''
+  FILES=""
+  SCRIPT_VERSION='2.0'
+  use_paths="false"
+
+# Path Alias
+  readonly _mktemp="/bin/mktemp"
+  readonly _sudo="/usr/bin/sudo"
+
+# allowed php versions
+  allowed_versions=(
+    "5.6" "56"
+    "7.0" "70"
+    "7.1" "71"
+    "7.2" "72"
+    "7.3" "73"
+    "7.4" "74"
+    "8.0" "80"
+    "8.1" "81"
+    "8.2" "82"
+  )
+# SSH options
+  ssh_opts=(
+    -o 'UserKnownHostsFile=/dev/null'
+    -o 'LogLevel=quiet'
+    -o 'StrictHostKeyChecking=no'
+    -o 'PreferredAuthentications=publickey'
+    -o 'ConnectTimeout=10'
+   )
+# mysql options
+  MYSQLDUMP_OPTS=(
+    "--opt"
+    "--skip-lock-tables"
+    "--routines"
+    "--max_allowed_packet=2G"
+  )
+
+# declare array on DB
+  declare -A DB
+
+# Help section
+_usage() {
+  cat <<- EOF
+
+Magesync Version ${SCRIPT_VERSION}
+
+Description: Magento Migration Tool
+Usage: magesync [Option]
+Advanced Usage: magesync -d -k /path/to/private/key
+
+  Supported Options:
+
+      -d|--database    Sync DB Only
+      -f|--files       Sync Files Only
+      -h|--help        Display this message
+      -F|--final       Final Sync [db + (pub or media) folder]
+      -I|--initial     Initial Sync
+
+          Optional Flag:
+              -k|--key         Use an existing SSH-Key
+
+EOF
+}
+
+# Extract Sudo
+my_sudo(){
+####need work on top line phpv_path is unassigned but used
+## used in cleanup
+  if [[ "$use_paths" = true ]]; then
+     "${_sudo}" -u "${linux_user}" "${phpv_path}" "${magento_path}" "$@"
+  else
+     "${_sudo}" -u "${linux_user}" "$@"
+  fi
+
+}
+
+# Extract SSH
+my_ssh(){
+  local _cmd=$1
+
+# shellcheck disable=SC2029
+  ssh "${ssh_opts[@]}" "${ssh_user}@${ssh_host}" "${_cmd}"
+}
+
+# Extract Rsync
+my_rsync(){
+
+   printf "doing rsync"
+}
+
+# Parse local.xml file
+xml_parse(){
+
+  local sed_args cut_cmd
+
+  sed_args=( -e "s/<\!\[CDATA\[//" -e "s/\]\]>//" -e "s/^.*<$2/<$2/" )
+  cut_cmd="cut -f2 -d'>'| cut -f1 -d'<'"
+
+  sudo grep "<$2>.*<.$2>" "$1" | sed "${sed_args[@]}" | eval "${cut_cmd}"
+
+}
+
+# Fetch magento1 db info from config file
+dbinfo_magento1(){
+
+  DB['NAME']=$(xml_parse "${config_file}" dbname)
+  DB['USER']=$(xml_parse "${config_file}" username)
+  DB['PASS']=$(xml_parse "${config_file}" password)
+  DB['HOST']=$(xml_parse "${config_file}" host)
+
+}
+
+# Fetch magento2 db info from config file
+dbinfo_magento2(){
+
+  local cut_cmd
+
+  cut_cmd="cut -d \' -f 4 | head -n1"
+
+  DB['NAME']=$(sudo grep -E 'dbname|DB_NAME' "${config_file}" | eval "${cut_cmd}")
+  DB['USER']=$(sudo grep -E 'username|DB_USER' "${config_file}" | eval "${cut_cmd}")
+  DB['PASS']=$(sudo grep -E 'password|DB_PASSWORD' "${config_file}" | eval "${cut_cmd}")
+  DB['HOST']=$(sudo grep -E 'host' "${config_file}" | eval "${cut_cmd}")
+
+}
+
+# Strip URL of any extra slashes
+_normalizedomain(){
+
+  local sed_args
+  sed_args=(-e 's/https?:\/\///' -e 's/\/.*//' -e 's,\.$,,')
+
+  echo "$1" | sed -r "${sed_args[@]}" | tr '[:upper:]' '[:lower:]'
+
+}
+
+# validate input on hostname, user and docroot, function for ask_source_info
+validate_input(){
+
+  local input pattern
+
+  input="$1"
+  pattern="$2"
+
+  if [[ ! "${input}" =~ ${pattern} ]]; then
+      printf "Error: Invalid input. Please try again\n"
+      return 1
+  fi
+  return 0
+
+}
+
+# Prompt and validate User input
+ask_source_info(){
+
+## todo: could see if we are working with a cluster
+
+  host_pattern="^[^.|*].*$"
+  user_pattern="^[^*/]+$"
+  path_pattern="^[^*]+$"
+
+  while true; do
+      read -r -p "Enter Host: " ssh_host
+      if ! validate_input "${ssh_host}" "${host_pattern}"; then
+          continue
+      fi
+      ssh_host="$(_normalizedomain "${ssh_host}")"
+      break
+  done
+
+  while true; do
+      read -r -p "Enter Username: " ssh_user
+      if ! validate_input "${ssh_user}" "${user_pattern}"; then
+          continue
+      fi
+      break
+  done
+
+  while true; do
+      read -r -p "Enter Port (Default is 22): " ssh_port
+      if [[ "${ssh_port}" == "" ]]; then
+          ssh_port=22
+          ssh_opts+=(-p "${ssh_port}")
+          break
+      elif ! [[ "${ssh_port}" =~ ^[0-9]+$ ]]; then
+          printf "Error: Invalid port. Please enter a valid number.\n"
+          continue
+      fi
+      break
+  done
+
+  while true; do
+      read -r -p "Enter path to site files: " app_docroot
+      if ! validate_input "${app_docroot}" "${path_pattern}"; then
+          continue
+      fi
+      break
+  done
+}
+
+# setup ssh key if -K flag was not used
+setup_ssh () {
+
+  local cat_pub_key ssh_key_opts
+
+  temp_path="$($_mktemp -d)"
+  ssh_key_opts=( -f "${temp_path}/nxmigs" -C "For NXmigs" -N '' )
+
+  if [[ -e "${KEY}" ]]; then
+      printf "%s\n" "Using PRIVATE-KEY From: ${KEY}"
+      ssh_opts+=(-i "${KEY}")
+  else
+      printf "Creating SSH-KEY...";
+      ssh-keygen -q -t rsa -b 4096 "${ssh_key_opts[@]}" ;
+      printf "done\n"
+
+      ssh_opts+=(-i "${temp_path}/nxmigs")
+      cat_pub_key=$(cat "${temp_path}"/nxmigs.pub);
+
+      printf "\n%s\n\n" "${cat_pub_key}"
+  fi
+
+  read -r -p "Is The Pub-Key Installed (Y/n)?: " key_installed;
+}
+
+# test ssh connection, should show success and if failed should prompt if they would like to try again
+test_ssh(){
+
+  local status_code yes_pattern try_again
+
+  yes_pattern="^(yes|y|Y|YES)$"
+  if [[ "${key_installed}" =~ ${yes_pattern} ]]; then
+      printf "Testing SSH...";
+    # shellcheck disable=SC2029
+      my_ssh "printf 'Status: (Success)\n'"
+#      my_ssh "printf 'Status: (Success)\n'" 2> "${logfile}";
+      status_code="$?";
+  else
+      printf "Exiting!\n"
+      exit 1
+  fi
+
+  if [[ "${status_code}" != 0 ]]; then
+    read -r -p "Status: (Failed: ${status_code}) Try Again? (Y/n): " try_again
+
+    if [[ "${try_again}" =~ ${yes_pattern} ]]; then
+        test_ssh;
+    else
+        printf "Exiting!\n"
+        exit 1
+    fi
+  fi
+}
+
+
+# stat remote config file
+setup_install(){
+### todo, see if we are working with a shared folder setup
+
+  env="env.php"
+  cms_version="2"
+  config_file="${app_docroot}/app/etc/${env}"
+  pub_media="pub"
+  printf "Gathering Source Info...\n"
+
+  if ! my_ssh "stat ${config_file}" > /dev/null 2>&1; then
+      config_file="${app_docroot}/../app/etc/${env}"
+      app_docroot="${app_docroot}/../"
+  elif ! my_ssh "stat ${config_file}" > /dev/null 2>&1; then
+      env="local.xml"
+      config_file="${app_docroot}/app/etc/${env}"
+      cms_version="1"
+      pub_media="media"
+  elif ! my_ssh "stat ${config_file}" > /dev/null 2>&1; then
+      config_file="${app_docroot}/../app/etc/${env}"
+      app_docroot="${app_docroot}/../"
+  elif ! my_ssh "stat ${config_file}" > /dev/null 2>&1; then
+      printf "done\n"
+      printf "Error: Unable to locate Magento config file.\n"
+      exit 1
+  fi
+}
+
+# Dump db from source, create db and import using importdb
+dump_and_importdb(){
+
+local MYSQLSTATUS import_args import_db sql_file
+### todo
+###check mysqldumb version and see if we need search and replace
+  printf "Gathering DB Info...\n"
+
+# shellcheck disable=SC2029
+  my_ssh "cat ${config_file}" > "${temp_path}"/MA-dbinfo.txt
+
+  config_file="${temp_path}/MA-dbinfo.txt"
+
+  if [[ "${cms_version}" == "2" ]]; then
+      dbinfo_magento2;
+  else
+      dbinfo_magento1;
+  fi
+
+# Add to existing Array
+  MYSQLDUMP_OPTS+=(
+    -h "${DB['HOST']}"
+    -u "${DB['USER']}"
+    -p "${DB['NAME']}"
+    "--password=${DB['PASS']}")
+
+#  MYSQLSTATUS=$(my_ssh "mysqladmin ${MYSQLDUMP_OPTS[*]} ping")
+
+## Check the output for the absence of "mysqld is alive"
+##  printf "Checking Mysql status..."
+#  if [[ "$MYSQLSTATUS" != *"mysqld is alive"* ]]; then
+#      printf "MySQL is not active or reachable. Error: $mysql_status\n"
+#      exit 1
+#  else
+#     printf "mysqld is alive\n"
+#  fi
+# Add in dbname as part of the array but just before the last OPT.
+#  MYSQLDUMP_OPTS=("${MYSQLDUMP_OPTS[@]:0:4}" -p "${DB['NAME']}" "${MYSQLDUMP_OPTS[@]:4}")
+
+  sql_file="${DB['NAME']}-${msync_date}-MA.sql.gz"
+
+# shellcheck disable=SC2029
+  if ! my_ssh "mysqldump ${MYSQLDUMP_OPTS[*]}" | pv -N "Dumping MySQL" -W -b | gzip > "${temp_path}/${sql_file}"; then
+    printf "MySQL dump failed. Please check your SSH connection and MySQL credentials.\n"
+    exit 1
+  fi
+
+  printf "Creating and Importing DB...\n"
+
+  import_args=( -f "${temp_path}/${sql_file}" -y -j )
+  import_db=$(importdb "${import_args[@]}")
+  target_db=$(echo "${import_db}" | jq -r '.username')
+  mysql_pass=$(echo "${import_db}" | jq -r '.password')
+  printf "\n"
+  printf "%s\n" "Database: ${target_db}"
+  printf "%s\n" "User: ${target_db}"
+  printf "%s\n" "Password: ${mysql_pass}"
+  printf "\n"
+}
+
+rsync_files() {
+
+  local rsync_args rsync_path rsync_to rsync_size
+
+  rsync_args=( -vrltD --stats --human-readable )
+
+  if [[ "${SYNC}" == "final" ]]; then
+      rsync_path="${app_docroot}/${pub_media}/"
+      rsync_to="./${pub_media}/"
+  else
+      rsync_path="${app_docroot}"
+      rsync_to="./"
+  fi
+
+  ssh_cmd="ssh ${ssh_opts[*]}"
+  user_host="${ssh_user}@${ssh_host}:${rsync_path}"
+
+  printf "Calculating Rsync Size. Please wait...\n"
+
+  #shellcheck disable=SC2029
+  rsync_size=$(my_ssh "find ${rsync_path} | wc -l")
+  pipev="pv -blep -s ${rsync_size}"
+  printf "Starting Rsync...\n"
+  sudo rsync -e "${ssh_cmd}" "${rsync_args[@]}" "${user_host}" "${rsync_to}" | "${pipev}" >/dev/null
+}
+
+change_owner(){
+  printf "Changing ownership...\n"
+  sudo chown -R "${linux_user}". ./
+}
+
+config_env() {
+### if we are to add cluster info we need to adjust for db host
+  local sed_args
+
+  if [[ "${DATABASE}" == "YES" || "${FILES}" == "YES" ]]; then
+    printf "Sync Is Complete\n"
+    exit 0
+  fi
+
+  case "${SYNC}:${cms_version}" in
+    "final:2")
+      config_file="./app/etc/env.php"
+      dbinfo_magento2
+      ;;
+    "final:1")
+      config_file="./app/etc/local.xml"
+      dbinfo_magento1
+      ;;
+  esac
+
+  sed_args=(
+    -e "s/${DB['NAME']}/${target_db}/g"
+    -e "s/${DB['USER']}/${target_db}/g"
+    -e "s/${DB['PASS']}/${mysql_pass}/g"
+    -e "s/${DB['HOST']}/localhost/g"
+   )
+
+  printf "%s" "Updating ${env}..."
+  my_sudo  cp "./app/etc/${env}" "./app/etc/${env}-MA-${msync_date}"
+  my_sudo sed -i "${sed_args[@]}" "./app/etc/${env}"
+}
+
+get_php(){
+  local config_pex source_php target_php head_cmd grep_cmd
+
+  config_pex="/usr/local/interworx/bin/config.pex"
+  iworx_info=$(sudo -u iworx "${config_pex}" --list --siteworx "${domain}")
+  head_cmd="head -n1 | grep -oP '\d+\.\d+' | tr -d '.'"
+  grep_cmd="grep 'X_PHP_V' | grep -oE '[0-9]+$'"
+  source_php=$(my_ssh "php -v" | eval "${head_cmd}")
+  target_php=$(echo "${iworx_info}" | eval "${grep_cmd}")
+
+  if [[ "${source_php}" != "${target_php}" ]]; then
+    printf "Source and Target PHP versions do not match!\n"
+    printf "%s\n" "Attempting to change PHP to ${source_php}"
+  fi
+
+  if [[ ! "${allowed_versions[*]}" =~ ${source_php} ]]; then
+      printf "Error: Source PHP is not in allowed php list.\n"
+  elif [[ ! $(hostname) =~ cloudhost && ! $(hostname) =~ saashost ]]; then
+        yes | switchphp "${linux_user}" "${source_php}"
+  else
+      printf "%s\n" "Changing PHP version to ${source_php}..."
+      sphp -p "${source_php}"
+  fi
+
+}
+
+
+pinned_note() {
+  local end_time
+  end_time=$(date "+%A %B %d %T %y")
+
+  printf "%s\n" "Msync Start: ${start_time}"
+  printf "%s\n" "Msync Finish: ${end_time}"
+  printf "%s\n" "Source Host: ${ssh_host}"
+  printf "%s\n" "Target Host: ${domain}"
+  printf "%s\n" "Source path: ${app_docroot}"
+  printf "\n";
+  printf "Things to check for\n"
+  printf "Remove the ssh pub-key\n"
+  printf "Copy crontab\n"
+}
+
+clean_up() {
+  printf "\nCleaning up..."
+  rm -r "${temp_path}"
+
+  if [[ "${SYNC}" == "final" ]]; then
+    printf "Disabling maintenance mode...\n"
+
+    if [[ "${cms_version}" == "2" ]]; then
+        my_sudo maintenance:disable
+    else
+        my_sudo rm ./maintenance.flag
+    fi
+  fi
+}
+
+# Convert long command line options into short ones for getopts
+_cmdline() {
+  local x;
+
+  for x in "${ARGA[@]}"; do
+    case "$x" in
+      "--database"|"-d")
+        args="${args}-d "
+        ;;
+      "--files"|"-f")
+        args="${args}-f "
+        ;;
+      "--final"|"-F")
+        args="${args}-F "
+        ;;
+      "--help"|"-h")
+        args="${args}-h "
+        ;;
+      "--initial"|"-I")
+        args="${args}-I "
+        ;;
+      "--key"|"-k")
+        args="${args}-k "
+        ;;
+      "--"*)
+        echo "$x is not a supported option." >&2
+        ;;
+      *)
+        args="${args}${x} "
+        ;;
+    esac
+  done
+
+  echo "$args";
+}
+
+# Main
+main () {
+
+  declare -a options
+
+  local cmdline;
+
+  mapfile -t cmdline < <(_cmdline | tr ' ' '\n');
+
+  while getopts ":dfFhIk:" OPTION "${cmdline[@]}"; do
+    case $OPTION in
+      d)
+        DATABASE="YES"
+        options+=("db")
+        ;;
+      F)
+        SYNC="final"
+        options+=("final")
+        ;;
+      f)
+        FILES="YES"
+        options+=("files")
+        ;;
+      h)
+        _usage;
+        exit
+        ;;
+      I)
+        SYNC="initial"
+        options+=("initial")
+        ;;
+      k)
+        KEY="${OPTARG}"
+        ;;
+      "?")
+        echo "-${OPTARG} is not a supported option." >&2
+        ;;
+      *);;
+    esac
+  done
+
+  linux_user="$(pwd | grep --color=auto -Po "/(chroot/)?home/\K[^/]*")";
+  domain="$(pwd| grep --color=auto -Po "/(chroot/)?home/${linux_user}/\K[^/]*")";
+  domain_check=$(find /etc/httpd/conf.d/ -type f -iname "vhost_${domain}.conf")
+
+  if [[ -z ${domain_check} ]]; then
+      printf "Error: Must be in a domain directory\n"
+      exit 1
+  fi
+
+  if [[ ${#options[@]} -gt 1 ]]; then
+    printf "Error: Only one option is allowed.\n"
+    exit 1
+  fi
+  msync_date="$(date +%m-%d-%y-"%R" | sed 's/:/-/g')"
+#  user_home="/home/${linux_user}";
+  start_time=$(date "+%A %B %d %T %y")
+#  logfile="$HOME/magesync-${msync_date}.log"
+
+# Ask for host,user,port
+  ask_source_info;
+
+# create ssh key or look for exiting
+  setup_ssh
+
+# Test ssh by using echo
+  test_ssh
+
+# figure out what install we are working with and where config file is
+  setup_install
+
+# export and import db
+  if [[ "${FILES}" == "" ]]; then
+    dump_and_importdb
+  fi
+
+# Sync files
+  if [[ "${DATABASE}" == "" ]]; then
+    rsync_files
+    change_owner
+  fi
+
+# config env
+  config_env
+
+# clean up tmp dir
+  clean_up
+
+}
+main;
