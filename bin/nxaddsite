@@ -40,13 +40,13 @@ _normalize_domain(){
   while true; do
     php_status=$(curl -s "${api_url}/${acc_id}${task_uri}" "${headers[@]}" | jq -r '.status')
 
-    if [[ "${php_status}" == "processing" ]]; then
+    if [[ "${site_status}" == "processing" ]]; then
       sleep 5
-    elif [[ "${php_status}" == "success" ]]; then
+    elif [[ "${site_status}" == "success" ]]; then
       printf "done\n"
       printf "%sPHP version successfully changed to ${phpv}\n"
       break
-    elif [[ "${php_status}" == "failure" ]]; then
+    elif [[ "${site_status}" == "failure" ]]; then
       printf "done\n"
       printf "PHP Version Switch failed\n"
       break
