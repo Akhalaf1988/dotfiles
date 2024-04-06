@@ -1,0 +1,207 @@
+#! /usr/bin/env bash
+
+# Script Arguments
+  ARGA=("$@")
+  DOMAIN=""
+  FILE=""
+
+_usage() {
+
+# Print help
+  cat <<- EOF
+
+Description: Site Creation Tool For Nexcess Cloud Servers.
+Usage: nxaddsite -d
+
+   Supported Options:
+
+     -d|--domain   Add Domain
+     -f|--file     TXT File With List Of Domains
+     -h|--help     Display This Message
+
+EOF
+}
+
+# Strip URL of any extra slashes
+_normalize_domain(){
+
+  local sed_args
+  sed_args=(-e 's/https?:\/\///' -e 's/\/.*//' -e 's,\.$,,')
+
+  echo "$1" | sed -r "${sed_args[@]}" | tr '[:upper:]' '[:lower:]'
+
+}
+
+#create_site(){
+
+## Todo
+
+# While true loop to check the task uri status
+  while true; do
+    php_status=$(curl -s "${api_url}/${acc_id}${task_uri}" "${headers[@]}" | jq -r '.status')
+
+    if [[ "${php_status}" == "processing" ]]; then
+      sleep 5
+    elif [[ "${php_status}" == "success" ]]; then
+      printf "done\n"
+      printf "%sPHP version successfully changed to ${phpv}\n"
+      break
+    elif [[ "${php_status}" == "failure" ]]; then
+      printf "done\n"
+      printf "PHP Version Switch failed\n"
+      break
+    fi
+  done
+
+
+#}
+
+#_get_site_info(){
+
+## Todo
+## Determine what type of plan, create the header for the request, send to create site
+
+#}
+
+check_api(){
+
+# Declare local variables
+  local resp
+
+# Define siteworx var
+  siteworx=$(sudo -u iworx /usr/local/interworx/bin/config.pex --list --siteworx "${dom}");
+
+# Extract site ID and account ID from siteworx data
+  site_id=$(echo "${siteworx}" | grep 'account_id' | awk '{print $2}');
+  acc_id=$(echo "${siteworx}" | grep '^client_id' | awk '{print $2}');
+
+# set headers for the request
+  headers=(
+    -H "Authorization: Bearer ${NWTOKEN}"
+    -H "Accept: application/json"
+    -w "%{http_code}"
+    -o "/dev/null"
+  )
+
+# Set API URL and container endpoint
+  api_url='https://nocworx.nexcess.net/api/v1/as-client/'
+  client_endpoint="${acc_id}/v1/client"
+
+  printf "\nChecking api-key..."
+
+# Send curl to check api response
+  resp=$(curl --silent "${api_url}${client_endpoint}" "${headers[@]}");
+
+# Check reponse code. If not 200 get host and port info
+# Else try to get the container info with api info
+  if [[ "${resp}" -ne 200 ]]; then
+     printf "done\n"
+     printf "%sAPI Token  not valid ${resp}\n";
+  else
+     printf "done\n"
+#     _get_site_info;
+  fi
+
+}
+
+_check_api_input(){
+
+# prompt for api-key if -a flag is used
+  if [[ -z "${NWTOKEN}" && "${API_KEY}" == "YES" ]]; then
+      read -r -p "Enter API-TOKEN: " api_token
+      NWTOKEN="${api_token}"
+  fi
+    check_api;
+
+}
+
+_check_user_input(){
+
+  if [[ "${DOMAIN}" == "YES" ]]; then
+     read -r -p "Domain: " domain
+       domain="$(_normalize_domain ${domain})"
+  elif [[ "${FILE}" == "YES" ]]; then
+     read -r -p "Full path to txt file: " TXT
+  else
+      printf "Please select an option\n"
+  fi
+}
+
+_cmdline() {
+
+  local x;
+
+  for x in "${ARGA[@]}"; do
+
+    case "$x" in
+     "--domain"|"-d")
+        args="${args}-d "
+        ;;
+     "--file"|"-f")
+        args="${args}-f "
+        ;;
+     "--help"|"-h")
+        args="${args}-h "
+        ;;
+      "--"*)
+        echo "$x is not a supported option." >&2
+        ;;
+      *)
+        args="${args}${x} "
+        ;;
+    esac
+  done
+
+  echo "$args";
+
+}
+
+main(){
+
+  local cmdline;
+
+  mapfile -t cmdline < <(_cmdline | tr ' ' '\n');
+
+  while getopts ":dfh" OPTION "${cmdline[@]}"; do
+
+    case $OPTION in
+      d)
+        DOMAIN="YES";
+        ;;
+      f)
+        FILE="YES";
+        ;;
+      h)
+        _usage;
+        exit 0;
+        ;;
+     "?")
+        echo "-${OPTARG} is not a supported option." >&2
+        ;;
+      *);;
+    esac
+  done
+
+# Set variables for the domain information
+
+  user="$(pwd | grep -Po "/(chroot/)?home/\K[^/]*")";
+  dom="$(pwd| grep -Po "/(chroot/)?home/${user}/\K[^/]*")";
+  vhost=$(find /etc/httpd/conf.d/ -type f -iname "vhost_${dom}.conf")
+
+# Check for a vhost with the domain name
+  if [[ -z ${vhost} ]]; then
+    echo -e "Must be in a domain directory";
+    exit 1
+  fi
+
+#
+  _check_user_input
+
+
+# check for input or an existing api key
+
+  _check_api_input
+
+}
+
+main
