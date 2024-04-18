@@ -23,60 +23,153 @@ Usage: nxaddsite -d
 EOF
 }
 
-# Strip URL of any extra slashes
 _normalize_domain(){
 
   local sed_args
-  sed_args=(-e 's/https?:\/\///' -e 's/\/.*//' -e 's,\.$,,')
 
+  sed_args=(-e 's/https?:\/\///' -e 's/\/.*//' -e 's,\.$,,')
+# Strip URL of any extra slashes
   echo "$1" | sed -r "${sed_args[@]}" | tr '[:upper:]' '[:lower:]'
 
 }
 
-
-create_site(){
+_create_site(){
 
   domain="$1"
+  legacy_api_url='https://portal.nexcess.net/'
+  legacy_endpoint='cloud-account'
   printf "%sCreating ${domain}\n"
-  sleep 3
-#  app_id=$(echo "${siteworx}" | grep 'app_id' | awk '{print $2}');
-#  service_id=$(echo "${siteworx}" | grep 'service_id' | awk '{print $2}');
 
-## Todo
-# Remove the elements for headers array we don't want from existing array in check_api
-# should remove -w "%{http_code}" and -o "/dev/null"
-#  headers=("${headers[@]:0:2}")
 
-# Add new headers to the existing array specifically for the POST request
-#  headers+=(
-#    -H "Content-type: application/json"
-#    -d "{\"service_id\":\"${service_id}\", \"install_app\": \"on\", \"nickname\": \"${domain}\"}"
-#  )
-# Set site create endpoint
-#  site_create_endpoint="${acc_id}/v1/cloud-account/"
 
+
+# curl -v -L -X POST 'https://portal.nexcess.net/cloud-account' -H 'Content-Type: application/json' -H "Authorization: Bearer ${NWTOKEN}" -d '{"service_id": "9486974", "install_app": "on","nickname": "aktesting2.com"}'
 # make the curl request to create site
-#  site_create_curl=$(curl -sX POST "${api_url}/${site_create_endpoint}" "${headers[@]}")
-
-# Kick off the site creation and grab the task uri
-#  task_uri=$(echo "${site_create_curl}" | jq -r '.metadata.uri')
+#  site_create_curl=$(curl -s-L -X POST "${legacy_api_url}/${legacy_endpoint}" "${headers[@]}")
 
 # remove the -d header from the array
 #  headers=("${headers[@]:0:2}")
 
+  sleep 3
+
 }
 
 # Function to process domains from a file
-process_domains() {
+_process_domains() {
 
     # Read each domain from the file, normalize domain and create site
     while IFS= read -r domain; do
         normalized_domain=$(_normalize_domain "${domain}")
-       create_site "$normalized_domain"
+       _create_site "$normalized_domain"
     done < "$file"
 }
 
-check_api(){
+_create_api_token(){
+
+echo "creating api token"
+
+}
+
+_delete_api_token(){
+
+echo "deleting api token"
+
+}
+
+_site_info(){
+
+  echo "this is where we find out what plan it is"
+
+# Extract app_id from siteworx data
+  app_id=$(echo "${siteworx}" | grep 'app_id' | awk '{print $2}');
+
+# Check app_id and set site_create_endpoint accordingly
+  case "${app_id}" in
+      19)
+          legacy_site_create_endpoint="/cloud-account/"
+#         headers+=(
+#           -H "Content-type: application/json"
+#           -d "{\"service_id\":\"${service_id}\", \"install_app\": \"on\", \"nickname\": \"${domain}\"}"
+       #  )
+          printf "wordpress\n"
+          ;;
+      11)
+          legaacy_site_create_endpoint="/cloud-account/${site_id}"
+          printf "magento\n"
+#         headers+=(
+#           -H "Content-type: application/json"
+#           -d "{\"domain\":\"${domain}\", \"app_id\": \"${app_id}\", \"_action\": \"add-child-account\"}"
+       #  )
+          ;;
+      17)
+         legacy_site_create_endpoint="/cloud-account/"
+#         headers+=(
+#           -H "Content-type: application/json"
+#           -d "{\"service_id\":\"${service_id}\", \"install_app\": \"on\", \"nickname\": \"${domain}\"}"
+       #  )
+          printf "woo-commerce\n"
+          ;;
+      *)
+          # Print a message for unexpected app_id values
+          printf "Functionality is designed only for WordPress/Woo and Magento environments.\n"
+          ;;
+  esac
+
+  case "${DOMAIN}" in
+      "YES")
+          _create_site "${domain}"
+          ;;
+      *)
+          _process_domains
+          ;;
+  esac
+}
+
+_site_count(){
+
+# Remove the elements for headers array we don't want from existing array in check_api
+# should remove -w "%{http_code}" and -o "/dev/null"
+  headers=("${headers[@]:0:2}")
+
+
+  printf "Site Check..."
+
+# Extract service_id and package_id from Siteworx data
+  service_id=$(echo "${siteworx}" | grep 'service_id' | awk '{print $2}');
+  package_id=$(echo "${siteworx}" | grep 'package_id' | awk '{print $2}');
+
+# Set Endpoints
+  site_count_endpoint="${acc_id}/v1/service/site/${service_id}"
+  site_total_endpoint="${acc_id}/v1/package/site/${package_id}"
+
+# Fetch site data from API
+  site_count=$(curl -s "${api_url}${site_count_endpoint}" "${headers[@]}" | jq -r '.sites[].identity' | wc -l);
+  site_total=$(curl -s "${api_url}${site_total_endpoint}" "${headers[@]}" | jq -r '.primary_accounts');
+  printf "done\n"
+
+# Print site usage information
+  printf "%sSites Used (${site_count}/${site_total})\n"
+
+# Determine extra domains/sites
+  if [[ "${DOMAIN}" == "YES" ]]; then
+      extra_domain="1"
+  else
+      extra_domain=$(wc -l < "${file}")
+  fi
+
+# Calculate total sites
+  total_sites=$((site_count + extra_domain))
+
+# Check if plan can accommodate additional sites
+  if [[ "${total_sites}" -gt "${site_total}" ]]; then
+     printf "%sThis plan can only fit ${site_total} site(s), please upgrade to fit ${total_sites}\n"
+     exit 1
+  fi
+
+
+}
+
+_check_api(){
 
 # Declare local variables
   local resp
@@ -88,7 +181,7 @@ check_api(){
   site_id=$(echo "${siteworx}" | grep 'account_id' | awk '{print $2}');
   acc_id=$(echo "${siteworx}" | grep '^client_id' | awk '{print $2}');
 
-# set headers for the request
+# Set headers for the API request
   headers=(
     -H "Authorization: Bearer ${NWTOKEN}"
     -H "Accept: application/json"
@@ -117,73 +210,97 @@ check_api(){
 
 }
 
-# validate input on hostname, file path
-validate_input(){
+# Description: Validates input against a specified pattern.
+# Parameters:
+# input: The input string to be validated.
+# pattern: The regular expression pattern used for validation.
+# Returns:
+# 0 if the input matches the pattern (valid input).
+# 1 if the input does not match the pattern (invalid input).
 
+_validate_input(){
+
+# Declare local variables for input and pattern
   local input pattern
 
+# Assign input and pattern from function parameters
   input="$1"
   pattern="$2"
 
+# Check if input matches the pattern using regular expression
   if [[ ! "${input}" =~ ${pattern} ]]; then
+      # Print error message if input does not match the pattern
       printf "Error: Invalid input. Please try again\n"
+      # Return 1 to indicate invalid input
       return 1
   fi
+# Return 0 to indicate valid input
   return 0
 
 }
 
+# Description: Validates user input for domain and file paths.
 _check_user_input(){
 
+# Define regular expression patterns for domain and file paths
   host_pattern="^[^.|*].*$"
   path_pattern="^[^*]+$"
 
+# Check for mutually exclusive options and handle accordingly
   case "${FILE}-${DOMAIN}" in
       YES-YES)
+          # Print error message if both FILE and DOMAIN are set to YES
           printf "You Can Only Select One Option, See Help Section.\n"
+          # Exit with error status 1
           exit 1
           ;;
       *)
+          # No conflict between options, continue processing
           ;;
   esac
-
+# Validate domain input if DOMAIN is set to YES
   case "${DOMAIN}" in
         YES)
             while true; do
+                # Prompt user for domain input
                 read -r -p "Domain: " domain
-                if ! validate_input "${domain}" "${host_pattern}"; then
-                    continue
+                # Validate domain input against host pattern
+                if ! _validate_input "${domain}" "${host_pattern}"; then
+                    continue # Continue loop if input is invalid
                 fi
+                # Normalize domain input (if needed)
                 domain="$(_normalize_domain "${domain}")"
-                check_api
-                create_site "${domain}"
-                break
+                break # Break out of loop if input is valid
             done
             ;;
         *)
+            # DOMAIN is not set to YES, skip domain validation
             ;;
     esac
 
+# Validate file path input if FILE is set to YES
     case "${FILE}" in
         YES)
             while true; do
+                # Prompt user for file path input
                 read -r -p "Path To Domain.txt File: " file
-                if ! validate_input "${file}" "${path_pattern}"; then
-                    continue
+                # Validate file path input against path pattern
+                if ! _validate_input "${file}" "${path_pattern}"; then
+                    continue # Continue loop if input is invalid
                 fi
+                # Check if file exists and is not empty
                 if [ ! -s "${file}" ]; then
                     printf "%sFile ${file} Does Not Exist Or Is Empty.\n"
+                    # Exit with error status 1 if file is missing or empty
                     exit 1
                 fi
-                check_api
-                process_domains
-                break
+                break # Break out of loop if input is valid
             done
             ;;
         *)
+            # FILE is not set to YES, skip file path validation
             ;;
     esac
-
 }
 
 _cmdline() {
@@ -247,18 +364,38 @@ main(){
   dom="$(pwd| grep -Po "/(chroot/)?home/${user}/\K[^/]*")";
   vhost=$(find /etc/httpd/conf.d/ -type f -iname "vhost_${dom}.conf")
 
-# Check for a vhost with the domain name
-  if [[ -z ${vhost} ]]; then
-    echo -e "Must be in a domain directory";
-    exit 1
-  fi
+# Make sure we are in a domain directory.
+  case "${vhost}" in
+      "")
+          printf "Vhost Not found, Make sure you are in a domain directory.\n"
+          exit 1
+          ;;
+      *)
+          ;;
+  esac
 
-  if [[ -z "${NWTOKEN}" ]]; then
-      read -r -p "Enter API-TOKEN: " api_token
-      NWTOKEN="${api_token}"
-  fi
+# Check for NWTOKEN
+  case "${NWTOKEN}" in
+      "")
+          read -r -p "Enter API-TOKEN: " api_token
+          NWTOKEN="${api_token}"
+          ;;
+      *)
+          ;;
+  esac
 
+
+# check what they want to happen
   _check_user_input
+
+# Verify api token works
+  _check_api
+
+# count sites
+  _site_count
+
+# find out what plan
+#  _site_info
 
 }
 
