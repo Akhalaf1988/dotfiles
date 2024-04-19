@@ -33,24 +33,55 @@ _normalize_domain(){
 
 }
 
+_delete_api_token(){
+
+  printf "Deleting client api-token..."
+
+# Reset Headers
+  headers=("${headers[@]:0:0}")
+
+# Add new header
+  headers=(
+    -H "Authorization: Bearer ${NWTOKEN}"
+    -H "Content-type: application/json"
+    -H "Accept: application/json"
+   )
+
+# delete token api request
+   curl -sX DELETE "${api_url}${token_endpoint}/${client_token_id}" "${headers[@]}"
+   printf "done\n"
+}
+
 _create_site(){
 
   domain="$1"
+# set legacy endpoints
   legacy_api_url='https://portal.nexcess.net/'
   legacy_endpoint='cloud-account'
+
+# Extract app_id from siteworx data
+  app_id=$(echo "${siteworx}" | grep 'app_id' | awk '{print $2}');
+
+# Reset Headers
+  headers=("${headers[@]:0:0}")
+
+# create new header because we need clients api token for this call.
+
+  headers=(
+    -H "Authorization: Bearer ${client_token_value}"
+    -H "Accept: application/json"
+    -H "Accept: application/json"
+    -d "{\"service_id\": \"${service_id}\", \"install_app\": \"on\",\"nickname\": \"${domain}\"}"
+ )
   printf "%sCreating ${domain}\n"
+###todo
 
 
+# Create site with POST request to legacy api
+  curl-L -X POST "${legacy_api_url}${legacy_endpoint}" "${header[@]}"
 
-
-# curl -v -L -X POST 'https://portal.nexcess.net/cloud-account' -H 'Content-Type: application/json' -H "Authorization: Bearer ${NWTOKEN}" -d '{"service_id": "9486974", "install_app": "on","nickname": "aktesting2.com"}'
-# make the curl request to create site
-#  site_create_curl=$(curl -s-L -X POST "${legacy_api_url}/${legacy_endpoint}" "${headers[@]}")
-
-# remove the -d header from the array
-#  headers=("${headers[@]:0:2}")
-
-  sleep 3
+# sleep for 5 seconds to give api time.
+  sleep 5
 
 }
 
@@ -66,54 +97,23 @@ _process_domains() {
 
 _create_api_token(){
 
-echo "creating api token"
+  printf "Creating client api-token..."
+# Set Token Endpoint
+  token_endpoint="${acc_id}/v1/api-token"
 
-}
+# Add additional elements to header array
+  headers+=(
+    -H "Content-type: application/json"
+    -d "{\"name\":\"nxaddsite-token\"}"
+     )
 
-_delete_api_token(){
+# Create Cleint api token and save it as a var
+  token_resp=$(curl -sX POST "${api_url}${token_endpoint}" "${headers[@]}");
 
-echo "deleting api token"
-
-}
-
-_site_info(){
-
-  echo "this is where we find out what plan it is"
-
-# Extract app_id from siteworx data
-  app_id=$(echo "${siteworx}" | grep 'app_id' | awk '{print $2}');
-
-# Check app_id and set site_create_endpoint accordingly
-  case "${app_id}" in
-      19)
-          legacy_site_create_endpoint="/cloud-account/"
-#         headers+=(
-#           -H "Content-type: application/json"
-#           -d "{\"service_id\":\"${service_id}\", \"install_app\": \"on\", \"nickname\": \"${domain}\"}"
-       #  )
-          printf "wordpress\n"
-          ;;
-      11)
-          legaacy_site_create_endpoint="/cloud-account/${site_id}"
-          printf "magento\n"
-#         headers+=(
-#           -H "Content-type: application/json"
-#           -d "{\"domain\":\"${domain}\", \"app_id\": \"${app_id}\", \"_action\": \"add-child-account\"}"
-       #  )
-          ;;
-      17)
-         legacy_site_create_endpoint="/cloud-account/"
-#         headers+=(
-#           -H "Content-type: application/json"
-#           -d "{\"service_id\":\"${service_id}\", \"install_app\": \"on\", \"nickname\": \"${domain}\"}"
-       #  )
-          printf "woo-commerce\n"
-          ;;
-      *)
-          # Print a message for unexpected app_id values
-          printf "Functionality is designed only for WordPress/Woo and Magento environments.\n"
-          ;;
-  esac
+# Extract Token ID and Value from token_resp
+  client_token_id=$(echo "${token_resp}" | jq -r '.id');
+  client_token_value=$(echo "${token_resp}" | jq -r '.token');
+  printf "done\n"
 
   case "${DOMAIN}" in
       "YES")
@@ -125,12 +125,37 @@ _site_info(){
   esac
 }
 
+
+_site_info(){
+
+  printf "Checking Site Info..."
+# Extract app_id from siteworx data
+  app_id=$(echo "${siteworx}" | grep 'app_id' | awk '{print $2}');
+
+# Check app_id to confirm we are working with wordpress or woo-commerce
+  case ${app_id} in
+      17 | 19)
+          printf "done\n"
+          ;;
+      *)
+          printf "done\n"
+          printf "Functionality is designed only for WordPress/Woo and Magento environments.\n"
+          exit 1
+          ;;
+  esac
+
+}
+
 _site_count(){
 
 # Remove the elements for headers array we don't want from existing array in check_api
 # should remove -w "%{http_code}" and -o "/dev/null"
-  headers=("${headers[@]:0:2}")
 
+  headers=("${headers[@]:0:2}")
+# add new elements to header array
+  headers=+(
+    -H "Accept: application/json"
+  )
 
   printf "Site Check..."
 
@@ -166,7 +191,6 @@ _site_count(){
      exit 1
   fi
 
-
 }
 
 _check_api(){
@@ -188,8 +212,8 @@ _check_api(){
     -w "%{http_code}"
     -o "/dev/null"
   )
-
-# Set API URL and container endpoint
+# I want to hit a less impactful endpoint to test the api token
+# Set API URL and client endpoint
   api_url='https://nocworx.nexcess.net/api/v1/as-client/'
   client_endpoint="${acc_id}/v1/client"
 
@@ -385,17 +409,20 @@ main(){
   esac
 
 
-# check what they want to happen
+# Verify Input
   _check_user_input
 
-# Verify api token works
+# Verify admin api token works
   _check_api
 
-# count sites
+# Determine if sites can fit on existing plan
   _site_count
 
-# find out what plan
-#  _site_info
+# Determine app id
+  _site_info
+
+# Create customer api token
+#  _create_api_token
 
 }
 
