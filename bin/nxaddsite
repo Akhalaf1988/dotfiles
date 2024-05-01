@@ -1,9 +1,9 @@
 #! /usr/bin/env bash
 
 # Script Arguments
-  ARGA=("$@")
-  DOMAIN=""
-  FILE=""
+ARGA=("$@")
+YES_DOMAIN=""
+YES_FILE=""
 
 _usage() {
 
@@ -14,11 +14,11 @@ Description: Site Creation Tool For MWP and Magento.
 Requires: Nocworx api-token
 Usage: nxaddsite -d domain.com; nxaddsite -f file.txt
 
-   Supported Options:
+	Supported Options:
 
-     -d|--domain   Create a site
-     -f|--file     Create muliple domains from a file.
-     -h|--help     Display This Message
+	-d|--domain   Create a site
+	-f|--file     Create muliple domains from a file.
+	-h|--help     Display This Message
 
 EOF
 
@@ -30,20 +30,19 @@ _normalize_domain(){
 
   sed_args=(-e 's/https?:\/\///' -e 's/\/.*//' -e 's,\.$,,')
 
-# Strip URL of any extra slashes
-  echo "$1" | sed -r "${sed_args[@]}" | tr '[:upper:]' '[:lower:]'
+  echo "$1" | sed -r "${sed_args[@]}" | tr '[:upper:]' '[:lower:]' # Strip URL of any extra slashes
 
 }
 
 _delete_api_token(){
 
-  printf "deleting client api-token..."
+  printf 'deleting client api-token...'
 
 # delete token api request
 
-  if ! curl -sX DELETE "${api_url}${token_endpoint}/${client_token_id}" "${headers[@]}" >/dev/null 2>&1; then
+  if ! curl -sX DELETE "${API_URL}${TOKEN_ENDPOINT}/${CLIENT_TOKEN_ID}" "${HEADERS[@]}" >/dev/null 2>&1; then
       printf "done\n"
-      printf "Failed to delete TokenID: %s\n" "${client_token_id}"
+      printf "Failed to delete TokenID: %s\n" "${CLIENT_TOKEN_ID}"
   else
       printf "done\n"
   fi
@@ -52,69 +51,47 @@ _delete_api_token(){
 
 scan_site(){
 
-  local end found new_site_data new_site_list new_site_count new_domain
-# Reset Headers to exclude -d
-  headers=("${headers[@]:0:6}")
+  local temp_domain_endpoint temp_domain_response temp_domain
 
-  end=$((SECONDS+5))
-  found=false
+  HEADERS=("${HEADERS[@]:0:6}"); # Reset Headers to exclude -d
 
-# Kind of janky workaround to get the new domain. This api endpoint does not give a task uri so we are left
-# With a best guess. We are going to grab the list of sites and count them, if the number is greater than our inital list show the last one which should be the newly added domain
-
- while [ ${SECONDS} -lt ${end} ]; do
-
-     new_site_data=$(curl -s "${api_url}${service_data_endpoint}" "${headers[@]}");
-     if [[ "${app_id}" == "11" ]]; then
-        new_site_list=$(echo "${new_site_data}" | jq -r '.sites[].identity, .child_sites[].identity');
-     else
-        new_site_list=$(echo "${new_site_data}" | jq -r '.sites[].identity');
-     fi
-     new_site_count=$(echo "${new_site_list}" | wc -l);
-     if [[ "${new_site_count}" -gt "${site_count}" ]]; then
-         new_domain=$(echo "${new_site_list}" | tail -n1);
-          printf "%s: %s\n" "${domain}" "${new_domain}"
-         found=true
-         break
-     fi
-     sleep 1  # Sleep for 1 second before trying again
- done
-
-# If no new domain found after the loop
-  if [ "${found}" = false ]; then
-      printf "unable to find new domain\n"
+  temp_domain_endpoint="${ACC_ID}/v1/cloud-account?filter%5Bnickname%5D=${DOMAIN}"
+  temp_domain_response=$(curl -s "${API_URL}${temp_domain_endpoint}" "${HEADERS[@]}");
+  temp_domain=$(echo "${temp_domain_response}" | jq -r '.[].temp_domain');
+  if [[ -z "${temp_domain}" ]]; then
+    printf "%s: unable to find temp domain\n" "${DOMAIN}"
+  else
+    printf "%s: %s\n" "${DOMAIN}" "${temp_domain}"
   fi
-
 }
 
 _create_site(){
 
-  local legacy_api_url legacy_endpoint client_headers
-  domain="$1"
+  local legacy_api_url legacy_endpoint
+  local -a client_headers
+  DOMAIN="$1"
 
-# set legacy endpoints
-  legacy_api_url='https://portal.nexcess.net/'
-  legacy_endpoint='cloud-account'
+  legacy_api_url='https://portal.nexcess.net/' # set legacy endpoints
 
 # create new header because we need clients api token for this call.
   client_headers=(
-    -H "Authorization: Bearer ${client_token_value}"
+    -H "Authorization: Bearer ${CLIENT_TOKEN_VALUE}"
     -H "Content-Type: application/json"
     -H "Accept: application/json"
  )
 
-  if [[ "${app_id}" == "11" ]]; then
-    legacy_endpoint="cloud-account/${site_id}"
+  if [[ "${APP_ID}" == "11" ]]; then
+    legacy_endpoint="cloud-account/${SITE_ID}"
     client_headers+=(
-         -d "{\"nickname\": \"${domain}\", \"app_id\": \"${app_id}\", \"install_app\": \"off\", \"_action\": \"add-child-account\"}")
+         -d "{\"nickname\": \"${DOMAIN}\", \"app_id\": \"${APP_ID}\", \"install_app\": \"off\", \"_action\": \"add-child-account\"}")
   else
     legacy_endpoint='cloud-account'
     client_headers+=(
-         -d "{\"service_id\": \"${service_id}\", \"install_app\": \"on\",\"nickname\": \"${domain}\"}")
+         -d "{\"service_id\": \"${SERVICE_ID}\", \"install_app\": \"on\",\"nickname\": \"${DOMAIN}\"}")
   fi
 
   if ! curl -sLX POST "${legacy_api_url}${legacy_endpoint}" "${client_headers[@]}" >/dev/null 2>&1; then
-      printf "Failed to create %s" "${domain}\n"
+      printf "Failed to create %s" "${DOMAIN}\n"
   else
       scan_site
   fi
@@ -124,36 +101,34 @@ _create_site(){
 _process_domains() {
 
 # Read each domain from the file, normalize domain and create site
-  printf "processing domains from %s\n" "${file}"
-  while IFS= read -r domain; do
-      normalized_domain=$(_normalize_domain "${domain}")
-      _create_site "${normalized_domain}"
+  printf "processing domains from %s\n" "${FILE}"
+  while IFS= read -r DOMAIN; do
+      NORMALIZED_DOMAIN=$(_normalize_domain "${DOMAIN}")
+      _create_site "${NORMALIZED_DOMAIN}"
       sleep 5
-  done < "${file}"
+  done < "${FILE}"
 
 }
 
 _create_api_token(){
-
-  printf "creating client api-token..."
-# Set Token Endpoint
-  token_endpoint="${acc_id}/v1/api-token"
+  local  token_resp
+  printf 'creating client api-token...'
+  TOKEN_ENDPOINT="${ACC_ID}/v1/api-token" # Set Token Endpoint
 
 # Add additional elements to header array
-  headers+=(
+  HEADERS+=(
     -H "Content-type: application/json"
     -d "{\"name\":\"nxaddsite-token\"}"
      )
 
 # Check if the curl command succeeded
-  if ! token_resp=$(curl -sX POST "${api_url}${token_endpoint}" "${headers[@]}"); then
+  if ! token_resp=$(curl -sX POST "${API_URL}${TOKEN_ENDPOINT}" "${HEADERS[@]}"); then
       printf "done\n"
-      printf "failed to create client api-token"
+      printf 'failed to create client api-token'
       exit 1
   else
-     # Extract Token ID and Value from token_resp
-     client_token_id=$(echo "${token_resp}" | jq -r '.id');
-     client_token_value=$(echo "${token_resp}" | jq -r '.token');
+     CLIENT_TOKEN_ID=$(echo "${token_resp}" | jq -r '.id'); # Extract Token ID from token_resp
+     CLIENT_TOKEN_VALUE=$(echo "${token_resp}" | jq -r '.token'); # Extract Token Value from token_resp
      printf "done\n"
   fi
 
@@ -161,18 +136,18 @@ _create_api_token(){
 
 _site_count(){
 
-  local  site_total extra_domain total_sites
+  local  initial_site_list site_total extra_domain total_sites
 
-  printf "checking plan capacity..."
+  printf 'checking plan capacity...'
 
 # Check app_id to confirm we are working with wordpress or woo-commerce
-  case ${app_id} in
+  case ${APP_ID} in
       17 | 19)
-          initial_site_list=$(echo "${service_data}" | jq -r '.sites[].identity');
+          initial_site_list=$(echo "${SERVICE_DATA}" | jq -r '.sites[].identity');
           site_total=$(echo "${package_data}" | jq -r '.primary_accounts');
           ;;
       11)
-          initial_site_list=$(echo "${service_data}" | jq -r '.sites[].identity, .child_sites[].identity');
+          initial_site_list=$(echo "${SERVICE_DATA}" | jq -r '.sites[].identity, .child_sites[].identity');
           site_total=$(echo "${package_data}" | jq -r '.child_accounts');
           site_total=$((site_total + 1));
           ;;
@@ -186,14 +161,13 @@ _site_count(){
   site_count=$(echo "${initial_site_list}" | wc -l);
 
 # Determine extra domains/sites
-  if [[ "${DOMAIN}" == "YES" ]]; then
+  if [[ "${YES_DOMAIN}" == "YES" ]]; then
       extra_domain="1"
   else
-      extra_domain=$(wc -l < "${file}")
+      extra_domain=$(wc -l < "${FILE}")
   fi
 
-# Calculate total sites
-  total_sites=$((site_count + extra_domain))
+  total_sites=$((site_count + extra_domain)); # Calculate total sites
 
 # Check if plan can accommodate additional sites
   if [[ "${total_sites}" -gt "${site_total}" ]]; then
@@ -206,60 +180,55 @@ _site_count(){
 }
 
 _get_site_info(){
-  local plan_name
-  printf "Getting site info..."
+  local plan_name service_data_endpoint package_data_endpoint
+  printf 'gathering site info...'
 
-# remove -w "%{http_code}" and -o "/dev/null"
-  headers=("${headers[@]:0:2}")
+  HEADERS=("${HEADERS[@]:0:2}"); # remove -w "%{http_code}" and -o "/dev/null"
 
 # add new element to header array
-  headers+=(
+  HEADERS+=(
     -H "Accept: application/json"
   )
 
-# Extract service_id and package_id from Siteworx data
-  service_id=$(echo "${siteworx}" | grep 'service_id' | awk '{print $2}');
-  package_id=$(echo "${siteworx}" | grep 'package_id' | awk '{print $2}');
-  app_id=$(echo "${siteworx}" | grep 'app_id' | awk '{print $2}');
-  site_id=$(echo "${siteworx}" | grep 'account_id' | awk '{print $2}');
+  SERVICE_ID=$(awk '/service_id/ {print $2}' <<< "${SITEWORX}"); # Extract Service_id from Siteworx data
+  PACKAGE_ID=$(awk '/package_id/ {print $2}' <<< "${SITEWORX}"); # Extract package_id from Siteworx data
+  APP_ID=$(awk '/app_id/ {print $2}' <<< "${SITEWORX}"); # Extract app_id from Siteworx data
+  SITE_ID=$(awk '/account_id/ {print $2}' <<< "${SITEWORX}"); # Extract Site_id from Siteworx data
 
-# Set service and package endpoints
-  service_data_endpoint="${acc_id}/v1/service/site/${service_id}"
-  package_data_endpoint="${acc_id}/v1/package/site/${package_id}"
-# Save data
-  service_data=$(curl -s "${api_url}${service_data_endpoint}" "${headers[@]}");
-  package_data=$(curl -s "${api_url}${package_data_endpoint}" "${headers[@]}");
-  plan_name=$(echo "${service_data}" | jq -r '.identity');
+  service_data_endpoint="${ACC_ID}/v1/service/site/${SERVICE_ID}" # Set service endpoints
+  package_data_endpoint="${ACC_ID}/v1/package/site/${PACKAGE_ID}" # Set Package endpoints
+
+  SERVICE_DATA=$(curl -s "${API_URL}${service_data_endpoint}" "${HEADERS[@]}"); # Save Service data
+  package_data=$(curl -s "${API_URL}${package_data_endpoint}" "${HEADERS[@]}"); # Save Package data
+  plan_name=$(echo "${SERVICE_DATA}" | jq -r '.identity');
   printf "done\n"
 
-  printf "AccountID: %s\n" "${acc_id}"
+  printf "AccountID: %s\n" "${ACC_ID}"
   printf "Plan Name: %s\n" "${plan_name}"
-  printf "ServiceID: %s\n" "${service_id}"
+  printf "ServiceID: %s\n" "${SERVICE_ID}"
 }
 
 _check_api(){
 
-  local resp
+  local resp client_endpoint
 
-# Extract site ID and account ID from siteworx data
-  acc_id=$(echo "${siteworx}" | grep '^client_id' | awk '{print $2}');
+  ACC_ID=$(awk '/^client_id/ {print $2}' <<< "${SITEWORX}"); # Extract account ID from siteworx data
 
-# Set headers for the API request
-  headers=(
+# Set HEADERS for the API request
+  HEADERS=(
     -H "Authorization: Bearer ${NWTOKEN}"
     -H "Accept: application/json"
     -w "%{http_code}"
     -o "/dev/null"
   )
+
 # Goal: hit a less impactful endpoint to test the api token
-# Set API URL and client endpoint
-  api_url='https://nocworx.nexcess.net/api/v1/as-client/'
-  client_endpoint="${acc_id}/v1/client"
+  API_URL='https://nocworx.nexcess.net/api/v1/as-client/' # Set API URL
+  client_endpoint="${ACC_ID}/v1/client" # Set client endpoint
 
-  printf "authenticating NWTOKEN..."
+  printf 'authenticating NWTOKEN...'
 
-# Send curl to check api response
-  resp=$(curl --silent "${api_url}${client_endpoint}" "${headers[@]}");
+ resp=$(curl --silent "${API_URL}${client_endpoint}" "${HEADERS[@]}"); # Send curl to check api response
 
 # Check reponse code. If not 200 get host and port info
 # Else try to get the container info with api info
@@ -303,7 +272,7 @@ _cmdline() {
 
 main(){
 
-  local cmdline;
+  local cmdline user vhost dom;
 
   mapfile -t cmdline < <(_cmdline | tr ' ' '\n');
 
@@ -311,14 +280,14 @@ main(){
 
     case $OPTION in
       d)
-        DOMAIN="YES"
-        domain=$(_normalize_domain "${OPTARG}")
+        YES_DOMAIN="YES"
+        DOMAIN=$(_normalize_domain "${OPTARG}")
         ;;
       f)
-        FILE="YES"
-        file="${OPTARG}"
-          if [ ! -s "${file}" ]; then
-            printf "%s Does Not Exist Or Is Empty.\n" "${file}"
+        YES_FILE="YES"
+        FILE="${OPTARG}"
+          if [[ ! -s "${FILE}" ]]; then
+            printf "%s Does Not Exist Or Is Empty.\n" "${FILE}"
             exit 1
         fi;
         ;;
@@ -333,7 +302,8 @@ main(){
     esac
   done
 
-  case "${DOMAIN}${FILE}" in
+# Do not allow both options to be selected
+  case "${YES_DOMAIN}${YES_FILE}" in
     "YESYES")
         printf "Only one option can be selected.\n"
         exit 1
@@ -342,6 +312,7 @@ main(){
         ;;
   esac
 
+# Prevent this script from running on anything but cloudhosts
   if [[ ! $(hostname) =~ cloudhost ]]; then
       printf "nxaddsite is only available on Nexcess Cloud Servers\n";
       exit 1;
@@ -352,8 +323,7 @@ main(){
   dom="$(pwd| grep -Po "/(chroot/)?home/${user}/\K[^/]*")";
   vhost=$(find /etc/httpd/conf.d/ -type f -iname "vhost_${dom}.conf")
 
-# Define siteworx var
-  siteworx=$(sudo -u iworx /usr/local/interworx/bin/config.pex --list --siteworx "${dom}");
+  SITEWORX=$(sudo -u iworx /usr/local/interworx/bin/config.pex --list --siteworx "${dom}"); # Define siteworx var
 
 # Make sure we are in a domain directory.
   case "${vhost}" in
@@ -375,29 +345,25 @@ main(){
           ;;
   esac
 
-# Verify admin api token works
-  _check_api
-# check plan for site details
- _get_site_info
+  _check_api # Verify admin api token works
 
-# Determine if sites can fit on existing plan
-  _site_count
+  _get_site_info # check plan for site details
 
-# Create customer api token
-  _create_api_token
+  _site_count # Determine if sites can fit on existing plan
 
-  case "${DOMAIN}" in
+  _create_api_token # Create customer api token
+
+  case "${YES_DOMAIN}" in
       "YES")
-          printf "creating %s\n" "${domain}"
-          _create_site "${domain}"
+          printf "creating %s\n" "${DOMAIN}"
+          _create_site "${DOMAIN}"
           ;;
       *)
           _process_domains
           ;;
   esac
 
-# Delete customer created api token
-  _delete_api_token
+  _delete_api_token # Delete customer created api token
 
 }
 
