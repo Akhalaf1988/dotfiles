@@ -57,7 +57,7 @@ scan_site(){
 
   temp_domain_endpoint="${ACC_ID}/v1/cloud-account?filter%5Bnickname%5D=${DOMAIN}"
   temp_domain_response=$(curl -s "${API_URL}${temp_domain_endpoint}" "${HEADERS[@]}");
-  temp_domain=$(echo "${temp_domain_response}" | jq -r '.[].temp_domain');
+  temp_domain=$(echo "${temp_domain_response}" | jq -r '.[].temp_domain'| tail -n1);
   if [[ -z "${temp_domain}" ]]; then
     printf "%s: unable to find temp domain\n" "${DOMAIN}"
   else
