@@ -17,7 +17,7 @@ Usage: nxaddsite -d domain.com; nxaddsite -f file.txt
 	Supported Options:
 
 	-d|--domain   Create a site
-	-f|--file     Create muliple domains from a file.
+	-f|--file     Create multiple domains from a file.
 	-h|--help     Display This Message
 
 EOF
