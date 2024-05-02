@@ -57,7 +57,7 @@ scan_site(){
 
   temp_domain_endpoint="${ACC_ID}/v1/cloud-account?filter%5Bnickname%5D=${DOMAIN}"
   temp_domain_response=$(curl -s "${API_URL}${temp_domain_endpoint}" "${HEADERS[@]}");
-  temp_domain=$(echo "${temp_domain_response}" | jq -r '.[].temp_domain'| tail -n1);
+  temp_domain=$(jq -r '.[].temp_domain' <<< "${temp_domain_response}" | tail -n1)
   if [[ -z "${temp_domain}" ]]; then
     printf "%s: unable to find temp domain\n" "${DOMAIN}"
   else
@@ -127,8 +127,8 @@ _create_api_token(){
       printf 'failed to create client api-token'
       exit 1
   else
-     CLIENT_TOKEN_ID=$(echo "${token_resp}" | jq -r '.id'); # Extract Token ID from token_resp
-     CLIENT_TOKEN_VALUE=$(echo "${token_resp}" | jq -r '.token'); # Extract Token Value from token_resp
+     CLIENT_TOKEN_ID=$(jq -r '.id' <<< "${token_resp}");
+     CLIENT_TOKEN_VALUE=$(jq -r '.token' <<< "${token_resp}");
      printf "done\n"
   fi
 
@@ -143,12 +143,12 @@ _site_count(){
 # Check app_id to confirm we are working with wordpress or woo-commerce
   case ${APP_ID} in
       17 | 19)
-          initial_site_list=$(echo "${SERVICE_DATA}" | jq -r '.sites[].identity');
-          site_total=$(echo "${package_data}" | jq -r '.primary_accounts');
+          initial_site_list=$(jq -r '.sites[].identity' <<< "${SERVICE_DATA}");
+          site_total=$(jq -r '.primary_accounts' <<< "${package_data}");
           ;;
       11)
-          initial_site_list=$(echo "${SERVICE_DATA}" | jq -r '.sites[].identity, .child_sites[].identity');
-          site_total=$(echo "${package_data}" | jq -r '.child_accounts');
+          initial_site_list=$(jq -r '.sites[].identity, .child_sites[].identity' <<< "${SERVICE_DATA}");
+          site_total=$(jq -r '.child_accounts' <<< "${package_data}");
           site_total=$((site_total + 1));
           ;;
       *)
@@ -158,7 +158,7 @@ _site_count(){
           ;;
   esac
 
-  site_count=$(echo "${initial_site_list}" | wc -l);
+  site_count=$(wc -l <<< "${initial_site_list}");
 
 # Determine extra domains/sites
   if [[ "${YES_DOMAIN}" == "YES" ]]; then
@@ -200,7 +200,7 @@ _get_site_info(){
 
   SERVICE_DATA=$(curl -s "${API_URL}${service_data_endpoint}" "${HEADERS[@]}"); # Save Service data
   package_data=$(curl -s "${API_URL}${package_data_endpoint}" "${HEADERS[@]}"); # Save Package data
-  plan_name=$(echo "${SERVICE_DATA}" | jq -r '.identity');
+  plan_name=$(jq -r '.identity' <<< "${SERVICE_DATA}");
   printf "done\n"
 
   printf "AccountID: %s\n" "${ACC_ID}"
