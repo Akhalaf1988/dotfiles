@@ -19,7 +19,7 @@ true > "${output_file}"
 
 # Loop through each order ID and make api call to check its details
 for order_id in "${ALL_ORDER_IDS[@]}"; do
-  order_deets=$(curl -sX POST --basic -u ${API_USER}:${API_PASS} "${API_URL}/${deets_endpoint}" -d "{\"params\":{\"order_id\":\"${order_id}\"}}")
+  order_deets=$(curl -sX POST --basic -u "${API_USER}:${API_PASS}" "${API_URL}/${deets_endpoint}" -d "{\"params\":{\"order_id\":\"${order_id}\"}}")
 
 # Extract subaccount types from order_deets
   sub_type=$(jq -r '.subaccnts[].type' <<< "${order_deets}")
@@ -55,7 +55,7 @@ fi
 
 _fectch_orders_from_departments() {
 
-local orders_endpoint departments item_count payload current_time last_hour order_timestamp last_hour_timestamp order_list
+local orders_endpoint item_count payload current_time last_hour order_timestamp last_hour_timestamp order_list
 
 # Set Orderlist endpoint and departments to scan
 orders_endpoint="billing/order/list.json"
@@ -105,7 +105,7 @@ EOF
   )
 
 # Make the API call to fetch orders
-  order_list=$(curl -sX POST --basic -u ${API_USER}:${API_PASS} -d "${payload}" "${API_URL}/${orders_endpoint}")
+  order_list=$(curl -sX POST --basic -u "${API_USER}:${API_PASS}" -d "${payload}" "${API_URL}/${orders_endpoint}")
 
 # Extract the number of items from the order_list, will cause a jq error trying to loop over 0 items
   item_count=$(jq '.items | length' <<< "${order_list}")
@@ -146,7 +146,7 @@ _test_api(){
     -o "/dev/null"
   )
 
-  resp_code=$(curl -sX POST --basic -u ${API_USER}:${API_PASS} "${API_URL}/${test_endpoint}" "${headers[@]}")
+  resp_code=$(curl -sX POST --basic -u "${API_USER}:${API_PASS}" "${API_URL}/${test_endpoint}" "${headers[@]}")
 
 # Check reponse code. If not 200 the api is down
 
