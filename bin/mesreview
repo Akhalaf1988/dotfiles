@@ -1,0 +1,170 @@
+#! /usr/bin/env bash
+
+## Global Variables
+API_URL='https://api.int.liquidweb.com'
+
+# Initialize an empty array to collect all order IDs
+ALL_ORDER_IDS=()
+DEPARTMENTS=("Service Delivery" "Imp" "Sales Engineering")
+
+# Function to scan order details for MES subaccounts and log to a file
+_scan_order_for_MES(){
+
+local sub_type sub_account_deets accnt_id output_file order_deets
+local deets_endpoint='billing/order/details.json'
+local output_file="${HOME}/mes_orders.log"
+
+# Empty the output file before writing new content
+true > "${output_file}"
+
+# Loop through each order ID and make api call to check its details
+for order_id in "${ALL_ORDER_IDS[@]}"; do
+  order_deets=$(curl -sX POST --basic -u ${API_USER}:${API_PASS} "${API_URL}/${deets_endpoint}" -d "{\"params\":{\"order_id\":\"${order_id}\"}}")
+
+# Extract subaccount types from order_deets
+  sub_type=$(jq -r '.subaccnts[].type' <<< "${order_deets}")
+
+# Check if any subaccount type matches MES products
+  if grep -q -e 'PrivateCl\|vCenter\|vDC\|MES\|VM.HA\|ADaaS' <<< "${sub_type}"; then
+    # Extract subaccount details, order date, and account ID
+    sub_account_deets=$(jq -r '.subaccnts[] | "\(.uniq_id)\t\(.type)"' <<< "${order_deets}")
+    order_date=$(jq -r '.order_date' <<< "${order_deets}")
+    accnt_id=$(jq -r '.accnt' <<< "${order_deets}")
+
+    # Print the extracted details to the output file
+    cat <<EOF "${output_file}"
+
+Account Name:
+Account ID: https://billing.int.liquidweb.com/content/admin/account/summary/?accnt=${accnt_id}
+Order ID: https://billing.int.liquidweb.com/content/admin/orders/details/?order_id=${order_id}
+Order Date: ${order_date}
+
+Subaccounts:
+${sub_account_deets}
+###########################
+EOF
+  fi
+done
+
+## Check if the output file is not empty and send an email
+if [[ -s "${output_file}" ]]; then
+  mail -s "MES Orders Report" akhalaf@nexcess.net < "${output_file}"
+fi
+}
+
+
+_fectch_orders_from_departments() {
+
+local orders_endpoint departments item_count payload current_time last_hour order_timestamp last_hour_timestamp order_list
+
+# Set Orderlist endpoint and departments to scan
+orders_endpoint="billing/order/list.json"
+
+# Get the current time and calculate the time one hour ago
+current_time=$(date +"%Y-%m-%d %H:%M:%S")
+last_hour=$(date -d "${current_time} 11 hours ago" +"%Y-%m-%d %H:%M:%S")
+
+# Convert the last_hour to a timestamp
+last_hour_timestamp=$(date -d "${last_hour}" +%s)
+
+# Loop through each department and fetch orders
+for department in "${DEPARTMENTS[@]}"; do
+
+# Construct payload for api call
+  payload=$(cat <<EOF
+{
+  "params": {
+    "orderAge": "1",
+    "auto_created": {
+      "-in": [1, 0]
+    },
+    "subaccntType": {
+      "-not_in": ["DNS.ZONE", "DREG", "SSL.DV"]
+    },
+    "alsowith": [
+      "hasNonReportingTrait",
+      "priorities",
+      "subaccntStats",
+      "departmentThreshold",
+      "workflowExecutionStatus",
+      "isVerified"
+    ],
+    "department": "${department}",
+    "excludeOrderStatus": ["cancelled", "complete", "rejected"],
+    "excludeAccountStatus": ["terminated", "suspended"],
+    "allowNonreportingAccounts": 0,
+    "page_num": 1,
+    "page_size": 100,
+    "order_by": {
+      "field": "order_date",
+      "sort": "desc"
+    }
+  }
+}
+EOF
+  )
+
+# Make the API call to fetch orders
+  order_list=$(curl -sX POST --basic -u ${API_USER}:${API_PASS} -d "${payload}" "${API_URL}/${orders_endpoint}")
+
+# Extract the number of items from the order_list, will cause a jq error trying to loop over 0 items
+  item_count=$(jq '.items | length' <<< "${order_list}")
+
+# If there are items in order_list
+if [[ "${item_count}" -gt 0 ]]; then
+  # Extract order IDs and dates from order_list
+  orders=$(jq -r '.items[] | "\(.order_id) \(.order_date)"' <<< "${order_list}")
+
+  # Loop through the extracted order IDs and dates
+  while IFS= read -r order; do
+    order_id=$(awk '{print $1}' <<< "${order}")
+    order_date=$(awk '{print $2 " " $3}' <<< "${order}")
+
+    # Convert the order_date to a timestamp
+    order_timestamp=$(date -d "${order_date}" +%s)
+
+    # Check if the order date is within the last hour
+    if [[ "${order_timestamp}" -ge "${last_hour_timestamp}" ]]; then
+      ALL_ORDER_IDS+=("${order_id}")
+    fi
+  done <<< "${orders}"
+fi
+
+done
+
+}
+
+# Fuction to test if api works and creds are correct
+_test_api(){
+
+  local test_endpoint headers resp_code
+
+# Set Test Endpoint
+  test_endpoint="Utilities/Info/ping"
+  headers=(
+    -w "%{http_code}"
+    -o "/dev/null"
+  )
+
+  resp_code=$(curl -sX POST --basic -u ${API_USER}:${API_PASS} "${API_URL}/${test_endpoint}" "${headers[@]}")
+
+# Check reponse code. If not 200 the api is down
+
+  if [[ "${resp_code}" -ne 200 ]]; then
+    printf "Api is down: %s\n" "$(date)" >> "${HOME}/mesorder.log"
+    exit 1
+  fi
+}
+
+# Main function to orchestrate the steps
+main(){
+# Test API creds
+  _test_api
+# Grab order ids that are from with last hour
+  _fectch_orders_from_departments
+# Scan that list for sub accounts that are MES and redirect to a file
+  _scan_order_for_MES
+}
+
+# Run the main function
+main;
