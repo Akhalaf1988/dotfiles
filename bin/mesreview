@@ -32,7 +32,7 @@ for order_id in "${ALL_ORDER_IDS[@]}"; do
     accnt_id=$(jq -r '.accnt' <<< "${order_deets}")
 
     # Print the extracted details to the output file
-    cat <<EOF "${output_file}"
+    cat <<EOF >> "${output_file}"
 
 Account Name:
 Account ID: https://billing.int.liquidweb.com/content/admin/account/summary/?accnt=${accnt_id}
