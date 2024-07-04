@@ -62,7 +62,7 @@ orders_endpoint="billing/order/list.json"
 
 # Get the current time and calculate the time one hour ago
 current_time=$(date +"%Y-%m-%d %H:%M:%S")
-last_hour=$(date -d "${current_time} 11 hours ago" +"%Y-%m-%d %H:%M:%S")
+last_hour=$(date -d "${current_time} 1 hours ago" +"%Y-%m-%d %H:%M:%S")
 
 # Convert the last_hour to a timestamp
 last_hour_timestamp=$(date -d "${last_hour}" +%s)
